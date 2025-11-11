@@ -10,17 +10,23 @@ from sqlalchemy.orm import selectinload
 
 from flowork.models import db, Product, Variant, StoreStock, Setting, Store
 from flowork.utils import clean_string_upper, get_choseong, generate_barcode, get_sort_key
-from flowork.services_excel import (
+
+# [수정] 모듈 경로 변경 (services_excel -> services.excel, services_db -> services.db)
+from flowork.services.excel import (
     import_excel_file,
     export_db_to_excel,
     export_stock_check_excel,
     _process_stock_update_excel,
     verify_stock_excel
 )
-from flowork.services_db import sync_missing_data_in_db
+from flowork.services.db import sync_missing_data_in_db
+
 from . import api_bp
 from .utils import admin_required, _get_or_create_store_stock
 from .tasks import TASKS, run_async_stock_upsert
+
+import openpyxl
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 @api_bp.route('/api/verify_excel', methods=['POST'])
 @login_required
@@ -864,6 +870,3 @@ def api_order_product_search():
         return jsonify({'status': 'success', 'products': results})
     else:
         return jsonify({'status': 'error', 'message': f"'{query}'(으)로 검색된 상품이 없습니다."}), 404
-
-import openpyxl
-from openpyxl.utils import get_column_letter, column_index_from_string
