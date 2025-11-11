@@ -1,5 +1,5 @@
 from flask import Blueprint
 
-ui_bp = Blueprint('ui', __name__, template_folder='../../templates')
+api_bp = Blueprint('api', __name__)
 
-from . import main, product, order, sales, admin
+from . import inventory, sales, order, schedule, admin, tasks
