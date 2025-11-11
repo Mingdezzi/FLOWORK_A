@@ -42,7 +42,7 @@ def create_app(config_class):
     # 3. 블루프린트 등록
     from .blueprints.ui import ui_bp 
     from .blueprints.api import api_bp
-    from .routes_auth import auth_bp 
+    from .blueprints.auth import auth_bp 
     
     app.register_blueprint(ui_bp)
     app.register_blueprint(api_bp)
