@@ -1,12 +1,11 @@
 import traceback
 from flask import render_template, request, abort
 from flask_login import login_required, current_user
-from sqlalchemy import func
+from sqlalchemy import func, or_  # [수정] or_ 추가됨
 from sqlalchemy.orm import selectinload, joinedload
 
 from flowork.models import db, Product, Variant, Store
 from flowork.utils import clean_string_upper
-# [수정] services 패키지 경로 수정
 from flowork.services.db import get_filter_options_from_db
 from . import ui_bp
 
@@ -248,6 +247,7 @@ def stock_management():
         abort(403, description="재고 관리는 매장 계정만 사용할 수 있습니다.")
 
     try:
+        # [수정] or_ 사용을 위해 상단에 from sqlalchemy import or_ 필요
         missing_data_products = Product.query.filter(
             Product.brand_id == current_user.current_brand_id, 
             or_(
