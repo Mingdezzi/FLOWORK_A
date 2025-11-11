@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLOWORK</title>
+    
+    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+</head>
+<body data-api-stores-url="{{ url_for('api.get_stores') }}"
+      data-api-stores-add-url="{{ url_for('api.add_store') }}"
+      data-api-store-update-url-prefix="{{ url_for('api.update_store', store_id=0)[:-1] }}"
+      data-api-store-delete-url-prefix="{{ url_for('api.delete_store', store_id=0)[:-1] }}"
+      data-api-brand-name-set-url="{{ url_for('api.update_brand_name') }}"
+      data-api-load-settings-url="{{ url_for('api.load_settings_from_file') }}"
+      data-api-setting-url="{{ url_for('api.update_setting') }}"
+      
+      data-api-staff-add-url="{{ url_for('api.add_staff') }}"
+      data-api-staff-update-url-prefix="{{ url_for('api.update_staff', staff_id=0)[:-1] }}"
+      data-api-staff-delete-url-prefix="{{ url_for('api.delete_staff', staff_id=0)[:-1] }}"
+      
+      data-api-store-approve-url-prefix="{{ url_for('api.approve_store', store_id=0)[:-1] }}"
+      data-api-store-toggle-active-url-prefix="{{ url_for('api.toggle_store_active', store_id=0)[:-1] }}"
+      data-api-store-reset-url-prefix="{{ url_for('api.reset_store_registration', store_id=0)[:-1] }}"
+      
+      data-analyze-excel-url="{{ url_for('api.analyze_excel') }}">
+    
+    <div class="container my-4">
+        
+        {% include '_header.html' %}
+
+        {% include '_navigation.html' %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert {{ 'alert-success' if category == 'success' else ('alert-info' if category == 'info' else ('alert-warning' if category == 'warning' else 'alert-danger')) }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+
+        <hr class="my-4">
+        <div class="mb-4">
+            <h2 class="section-title"><i class="bi bi-gear-fill me-2"></i>설정</h2>
+
+            {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
+            
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-patch-check-fill me-2"></i>브랜드 이름 설정</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>브랜드(상호명)를 설정합니다.</strong>
+                        <span>이 이름은 SMS 발송 시 사용됩니다. (예: FLOWORK)</span>
+                    </div>
+                    <form class="input-group" id="form-brand-name">
+                        <input type="text" class="form-control" placeholder="예: FLOWORK" id="brand-name-input" value="{{ brand_name or '' }}" required>
+                        <button class="btn btn-primary" type="submit" id="btn-save-brand-name">
+                            <i class="bi bi-save-fill me-1"></i> 브랜드 이름 저장
+                        </button>
+                    </form>
+                    <div id="brand-name-status" class="mt-2"></div>
+                </div>
+            </div>
+
+            <div class="card mb-3 management-section border-info">
+                <div class="card-header bg-info text-dark">
+                    <h3 class="mb-0"><i class="bi bi-file-earmark-code-fill me-2"></i>브랜드 설정 파일 로드</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>서버에 저장된 설정 파일(JSON)을 불러와 DB에 적용합니다.</strong>
+                        <span><code>flowork/brands/{{ current_user.brand.brand_name }}.json</code> 파일을 읽습니다.<br>
+                        (바코드 규칙, 사이즈 정렬 순서, 허용 카테고리 등)</span>
+                    </div>
+                    <button class="btn btn-info" type="button" id="btn-load-settings">
+                        <i class="bi bi-cloud-upload-fill me-1"></i> 설정 파일 로드 및 적용
+                    </button>
+                    <div id="load-settings-status" class="mt-2"></div>
+                </div>
+            </div>
+
+            <div class="card mb-3 management-section border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-grid-fill me-2"></i>검색 카테고리 버튼 설정</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>상품 검색 화면의 카테고리 버튼 배치와 구성을 설정합니다.</strong>
+                        <span>원하는 만큼 버튼을 추가하고, 한 줄에 몇 개씩 보여줄지(열 개수) 설정하세요.</span>
+                    </div>
+                    
+                    <form id="form-category-config">
+                        <div class="mb-3">
+                            <label for="cat-columns" class="form-label fw-bold">한 줄에 표시할 버튼 수 (열 개수)</label>
+                            <select id="cat-columns" class="form-select" style="max-width: 200px;">
+                                <option value="2">2개 (2열)</option>
+                                <option value="3">3개 (3열)</option>
+                                <option value="4" selected>4개 (4열 - 기본)</option>
+                                <option value="5">5개 (5열)</option>
+                                <option value="6">6개 (6열)</option>
+                                <option value="8">8개 (8열)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">버튼 목록 구성</label>
+                            <div id="cat-buttons-container">
+                                </div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btn-add-cat-row">
+                                <i class="bi bi-plus-lg"></i> 버튼 추가
+                            </button>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="btn-save-cat-config">
+                            <i class="bi bi-save-fill me-1"></i> 설정 저장
+                        </button>
+                    </form>
+                    <div id="category-config-status" class="mt-2"></div>
+                </div>
+            </div>
+            {% endif %}
+
+
+            {% if current_user.store_id %}
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-shop me-2"></i>'우리 매장' 정보</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>현재 로그인된 '우리 매장' 정보입니다.</strong>
+                        <span>'우리 매장' 정보는 '전체 매장 관리'에서 수정할 수 있습니다.</span>
+                    </div>
+                    {% set my_store = all_stores | selectattr('id', 'equalto', my_store_id) | first %}
+                    {% if my_store %}
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">매장 코드</dt>
+                        <dd class="col-sm-9">{{ my_store.store_code or '(없음)' }}</dd>
+                        <dt class="col-sm-3">매장 이름</dt>
+                        <dd class="col-sm-9">{{ my_store.store_name }}</dd>
+                        <dt class="col-sm-3">연락처</dt>
+                        <dd class="col-sm-9">{{ my_store.phone_number or '(없음)' }}</dd>
+                    </dl>
+                    {% else %}
+                    <p class="text-danger">오류: 현재 매장 정보를 찾을 수 없습니다.</p>
+                    {% endif %}
+                    <div id="my-store-status" class="mt-2"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-building me-2"></i>전체 매장 관리 (가입 승인)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>브랜드에 소속될 매장 목록을 미리 등록합니다.</strong>
+                        <span>매장 담당자는 로그인 페이지의 '매장 등록'을 통해 가입 신청을 할 수 있습니다.<br>
+                        '등록유무'가 O 인 매장은 가입 신청이 들어온 매장이며, '승인' 처리를 해주어야 로그인이 가능합니다.</span>
+                    </div>
+                    
+                    <h5 class="section-title-sub">신규 매장 등록 (본사)</h5>
+                    <form id="form-add-store" class="mb-3">
+                         <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-md-4">
+                                <label for="new_store_code" class="form-label">매장 코드*</label>
+                                <input type="text" class="form-control" id="new_store_code" placeholder="예: BS100" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="new_store_name" class="form-label">매장 이름*</label>
+                                <input type="text" class="form-control" id="new_store_name" placeholder="예: FLOWORK 부산" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="new_store_phone" class="form-label">매장 연락처</label>
+                                <input type="tel" class="form-control" id="new_store_phone" placeholder="예: 02-123-4567">
+                            </div>
+                        </div>
+                        <button class="btn btn-success" type="submit" id="btn-add-store">
+                            <i class="bi bi-plus-lg me-1"></i> 신규 매장 추가
+                        </button>
+                    </form>
+                    <div id="add-store-status" class="mt-2 mb-3"></div>
+
+                    <hr>
+                    
+                    <h5 class="section-title-sub">전체 매장 목록</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="all-stores-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>매장코드</th>
+                                    <th>매장이름</th>
+                                    <th>연락처</th>
+                                    <th>담당자</th>
+                                    <th>등록유무</th>
+                                    <th>승인/활성</th>
+                                    <th style="width: 150px;">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for store in all_stores %}
+                                <tr id="store-row-{{ store.id }}">
+                                    <td data-field="code">{{ store.store_code or '' }}</td>
+                                    <td data-field="name">{{ store.store_name }}</td>
+                                    <td data-field="phone">{{ store.phone_number or '' }}</td>
+                                    <td data-field="manager">{{ store.manager_name or '' }}</td>
+                                    
+                                    <td data-field="registered" class="text-center">
+                                        {% if store.is_registered %}
+                                            <span class="badge bg-success">O</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">X</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <td data-field="approved" class="text-center">
+                                        {% if not store.is_registered %}
+                                            <span class="badge bg-secondary">등록대기</span>
+                                        {% elif not store.is_approved %}
+                                            <span class="badge bg-warning text-dark">승인대기</span>
+                                        {% elif not store.is_active %}
+                                            <span class="badge bg-danger">비활성</span>
+                                        {% else %}
+                                            <span class="badge bg-info">승인(활성)</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <td>
+                                        {% if store.is_registered and not store.is_approved %}
+                                        <button class="btn btn-success btn-sm py-0 px-1 btn-approve-store"
+                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
+                                                title="가입 승인">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                        </button>
+                                        {% endif %}
+                                        
+                                        <button class="btn btn-info btn-sm py-0 px-1 btn-edit-store" 
+                                                data-bs-toggle="modal" data-bs-target="#edit-store-modal"
+                                                data-id="{{ store.id }}"
+                                                data-code="{{ store.store_code or '' }}"
+                                                data-name="{{ store.store_name }}"
+                                                data-phone="{{ store.phone_number or '' }}"
+                                                title="매장 정보 수정">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        
+                                        {% if store.is_registered %}
+                                        <button class="btn btn-warning btn-sm py-0 px-1 btn-reset-store"
+                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
+                                                title="등록 초기화 (매장 재가입 필요)">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                        {% endif %}
+                                        
+                                        <button class="btn btn-secondary btn-sm py-0 px-1 btn-toggle-active-store"
+                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
+                                                title="{{ '매장 비활성화' if store.is_active else '매장 활성화' }}">
+                                            {% if store.is_active %}
+                                                <i class="bi bi-eye-slash-fill"></i>
+                                            {% else %}
+                                                <i class="bi bi-eye-fill"></i>
+                                            {% endif %}
+                                        </button>
+
+                                        {% if not store.is_registered %}
+                                        <button class="btn btn-danger btn-sm py-0 px-1 btn-delete-store"
+                                                data-id="{{ store.id }}"
+                                                data-name="{{ store.store_name }}"
+                                                title="매장 삭제">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr id="no-other-stores">
+                                    <td colspan="7" class="text-center text-muted">등록된 매장이 없습니다.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="delete-store-status" class="mt-2"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if current_user.is_admin and current_user.store_id %}
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-person-badge me-2"></i>직원 명단 관리 (현재 매장)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>현재 매장에 소속된 직원을 관리합니다. (스케줄 등록용)</strong>
+                        <span>(이 명단은 로그인 계정과 별개입니다.)</span>
+                    </div>
+                    
+                    <h5 class="section-title-sub">신규 직원 등록</h5>
+                    <form id="form-add-staff" class="mb-3">
+                         <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-md-4">
+                                <label for="new_staff_name" class="form-label">직원 이름*</label>
+                                <input type="text" class="form-control" id="new_staff_name" placeholder="예: 홍길동" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="new_staff_position" class="form-label">직책</label>
+                                <input type="text" class="form-control" id="new_staff_position" placeholder="예: 매니저">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="new_staff_contact" class="form-label">연락처</label>
+                                <input type="tel" class="form-control" id="new_staff_contact" placeholder="예: 010-1234-5678">
+                            </div>
+                        </div>
+                        <button class="btn btn-success" type="submit" id="btn-add-staff">
+                            <i class="bi bi-person-plus-fill me-1"></i> 신규 직원 추가
+                        </button>
+                    </form>
+                    <div id="add-staff-status" class="mt-2 mb-3"></div>
+
+                    <hr>
+                    
+                    <h5 class="section-title-sub">직원 목록</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="all-staff-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>직원 이름</th>
+                                    <th>직책</th>
+                                    <th>연락처</th>
+                                    <th style="width: 100px;">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for staff in staff_list %}
+                                <tr id="staff-row-{{ staff.id }}">
+                                    <td data-field="name">{{ staff.name }}</td>
+                                    <td data-field="position">{{ staff.position or '' }}</td>
+                                    <td data-field="contact">{{ staff.contact or '' }}</td>
+                                    <td>
+                                        <button class="btn btn-info btn-sm py-0 px-1 btn-edit-staff" 
+                                                data-bs-toggle="modal" data-bs-target="#edit-staff-modal"
+                                                data-id="{{ staff.id }}"
+                                                data-name="{{ staff.name }}"
+                                                data-position="{{ staff.position or '' }}"
+                                                data-contact="{{ staff.contact or '' }}">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <button class="btn btn-danger btn-sm py-0 px-1 btn-delete-staff"
+                                                data-id="{{ staff.id }}"
+                                                data-name="{{ staff.name }}">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr id="no-staff">
+                                    <td colspan="4" class="text-center text-muted">등록된 직원이 없습니다.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="delete-staff-status" class="mt-2"></div>
+                </div>
+            </div>
+            {% endif %}
+
+
+            <hr class="my-4">
+            <h2 class="section-title"><i class="bi bi-database-gear me-2"></i>DB 관리 (백업/복구)</h2>
+
+            {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-database-fill-up me-2"></i>상품 데이터 백업 (브랜드 공통)</h3>
+                </div>
+                <div class="card-body">
+                     <div class="card-description">
+                        <strong>현재 브랜드의 상품 데이터(STOCK_INFO) 를 엑셀로 백업합니다.</strong>
+                        <span>(상품, 품목, 가격, **본사 재고**, **즐겨찾기** 포함) (매장 재고는 포함되지 않습니다.)</span>
+                    </div>
+                    <a href="{{ url_for('api.export_db_excel') }}" class="btn btn-success"><i class="bi bi-download me-1"></i>엑셀 다운로드</a>
+                </div>
+            </div>
+
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-database-fill-down me-2"></i>상품 데이터 전체 업로드 (DB 초기화)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>(요청) 엑셀 파일로 상품 데이터(STOCK_INFO)를 재설정합니다. (열 문자 선택)</strong>
+                        <span>(경고) 현재 브랜드의 기존 상품/옵션/재고 DB가 **모두 삭제**되고 엑셀 내용으로 덮어씁니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.import_excel') }}" method="POST" enctype="multipart/form-data" 
+                          class="update-stock-form" id="form-import-db"
+                          onsubmit="return confirm('🚨 경고! DB를 덮어씁니다.\n현재 브랜드의 모든 상품, 옵션, 재고 데이터가 영구 삭제됩니다.\n\n정말로 계속하시겠습니까?');">
+                        
+                        <div class="mb-3">
+                            <label for="db_excel_file" class="form-label file-upload-wrapper" id="wrapper-db-file">
+                                <i class="bi bi-file-earmark-excel-fill fs-4"></i>
+                                <div>파일 선택 (상품 DB)</div>
+                                <div class="file-status-text" id="status-db-file">엑셀 파일을 선택하세요.</div>
+                            </label>
+                            <input type="file" name="excel_file" class="form-control" accept=".xlsx, .xls" required id="db_excel_file">
+                        </div>
+
+                        <div class="column-mapping-grid mb-3" id="grid-import-db">
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_pn_db">품번*</label>
+                                <select id="col_pn_db" name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_pn_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_pname_db">품명*</label>
+                                <select id="col_pname_db" name="col_pname" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_pname_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_year_db">출시년도*</label>
+                                <select id="col_year_db" name="col_year" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_year_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_category_db">품목*</label>
+                                <select id="col_category_db" name="col_category" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_category_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_color_db">컬러*</label>
+                                <select id="col_color_db" name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_color_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_size_db">사이즈*</label>
+                                <select id="col_size_db" name="col_size" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_size_db"></div>
+                            </div></div>
+                            
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_oprice_db">최초가 (선택)</label>
+                                <select id="col_oprice_db" name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 0) --</option></select>
+                                <div class="col-preview" id="preview_col_oprice_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_sprice_db">판매가 (선택)</label>
+                                <select id="col_sprice_db" name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 최초가) --</option></select>
+                                <div class="col-preview" id="preview_col_sprice_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_favorite_db">즐겨찾기 (선택)</label>
+                                <select id="col_favorite_db" name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 열 (1, O, Y) --</option></select>
+                                <div class="col-preview" id="preview_col_favorite_db"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_hq_stock_db">본사재고 (선택)</label>
+                                <select id="col_hq_stock_db" name="col_hq_stock" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 0) --</option></select>
+                                <div class="col-preview" id="preview_col_hq_stock_db"></div>
+                            </div></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-upload me-1"></i>상품 DB 전체 업로드</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-arrow-repeat me-2"></i>누락 DB 자동 동기화</h3>
+                </div>
+                <div class="card-body">
+                     <div class="card-description">
+                        <strong>DB 의 누락된 데이터를 자동으로 동기화 합니다.</strong>
+                        <span>하단의 '데이터 동기화 실행' 버튼을 누르면, <br>DB 의 누락 된 부분을 자동으로 동기화 합니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.sync_missing_data') }}" method="POST" onsubmit="return confirm('데이터 동기화를 실행합니다.\n비어있는 품목/년도/가격 정보가 자동으로 채워집니다.\n계속하시겠습니까?');">
+                        <button type="submit" class="btn btn-info"><i class="bi bi-check2-circle me-1"></i>데이터 동기화 실행</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3 management-section">
+                 <div class="card-header">
+                     <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>누락 DB 수동 업로드</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>누락된 DB 의 항목을 수동으로 기록하여 업로드 합니다.</strong>
+                        <span>하단의 리스트에 있는 항목을 클릭 하여, 누락 된 데이터를 입력 후 저장 합니다.</span>
+                    </div>
+                    {% if missing_data_products %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover missing-data-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>품번</th>
+                                        <th>품명 (임시)</th>
+                                        <th>누락 정보</th>
+                                        <th>작업</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for product in missing_data_products %}
+                                    <tr>
+                                        <td>{{ product.product_number }}</td>
+                                        <td>{{ product.product_name }}</td>
+                                        <td>
+                                            {% if not product.release_year %}년도 {% endif %}
+                                            {% if not product.item_category %}품목{% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('ui.product_detail', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">
+                                                수정하기 <i class="bi bi-pencil-fill ms-1"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">데이터 수정이 필요한 신규 품목이 없습니다.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-building-gear me-2"></i>본사재고 UPSERT (추가/수정)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>(STOCK_HQ) 엑셀 파일로 '본사 재고' 및 '상품 정보'를 (추가/수정)합니다.</strong>
+                        <span>(9필드 UPSERT / 신규 상품/가격/재고 반영)</span>
+                    </div>
+                    
+                    <h5 class="section-title-sub mt-3">방식 1: 9필드 UPSERT (신규 상품/가격/재고 반영)</h5>
+                    <form id="form-update-hq-full" class="update-stock-form" onsubmit="return confirm('엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?');">
+                        
+                        <div class="mb-3">
+                             <label for="hq_stock_excel_file_full" class="form-label file-upload-wrapper" id="wrapper-hq-file-full">
+                                <i class="bi bi-file-earmark-excel-fill fs-4"></i>
+                                <div>파일 선택 (9필드 UPSERT)</div>
+                                <div class="file-status-text" id="status-hq-file-full">엑셀 파일을 선택하세요.</div>
+                            </label>
+                            <input type="file" name="excel_file" class="form-control" accept=".xlsx, .xls" required id="hq_stock_excel_file_full">
+                        </div>
+
+                        <div class="column-mapping-grid mb-3" id="grid-update-hq-full">
+                             <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_pn_hq_full">품번*</label>
+                                <select id="col_pn_hq_full" name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_pn_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_pname_hq_full">품명*</label>
+                                <select id="col_pname_hq_full" name="col_pname" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_pname_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_year_hq_full">출시년도 (선택)</label>
+                                <select id="col_year_hq_full" name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 비워둠) --</option></select>
+                                <div class="col-preview" id="preview_col_year_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_category_hq_full">품목 (선택)</label>
+                                <select id="col_category_hq_full" name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 비워둠) --</option></select>
+                                <div class="col-preview" id="preview_col_category_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_color_hq_full">컬러*</label>
+                                <select id="col_color_hq_full" name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_color_hq_full"></div>
+                            </div></div>
+                             <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_size_hq_full">사이즈*</label>
+                                <select id="col_size_hq_full" name="col_size" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_size_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_oprice_hq_full">최초가*</label>
+                                <select id="col_oprice_hq_full" name="col_oprice" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_oprice_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_sprice_hq_full">판매가*</label>
+                                <select id="col_sprice_hq_full" name="col_sprice" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_sprice_hq_full"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label for="col_stock_hq_full">본사재고*</label>
+                                <select id="col_stock_hq_full" name="col_hq_stock" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview" id="preview_col_stock_hq_full"></div>
+                            </div></div>
+                        </div>
+                        
+                        <div class="progress-wrapper mb-3" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="progress-status text-center mt-1 text-muted small">처리 중...</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise me-1"></i>본사재고 UPSERT (9필드)</button>
+                    </form>
+                    
+                    </div>
+            </div>
+
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-house-gear me-2"></i>매장재고 엑셀 업로드 (본사 전용)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>엑셀 파일로 '선택한 매장'의 재고(StoreStock.quantity)만 업데이트합니다. (바코드 2필드 기준)</strong>
+                        <span>(1) '업데이트 대상 매장' 선택 -> (2) '파일 선택' -> (3) 열 분석 -> (4) '매장재고 업데이트' 클릭</span>
+                    </div>
+                    
+                    <form action="{{ url_for('api.update_store_stock_excel') }}" method="POST" enctype="multipart/form-data" 
+                          class="update-stock-form" id="form-update-store-hq"
+                          onsubmit="return confirm('엑셀 파일 기준으로 선택한 매장의 재고를 (재고만) 수정합니다.\n(바코드 2필드 기준 / 신규 상품 추가 안함)\n계속하시겠습니까?');">
+                        
+                        <div class="mb-3">
+                            <label for="target_store_id" class="form-label fw-bold">업데이트 대상 매장*</label>
+                            <select class="form-select" id="target_store_id" name="target_store_id" required>
+                                <option value="">-- 재고를 적용할 매장을 선택하세요 --</option>
+                                {% for store in all_stores %}
+                                <option value="{{ store.id }}">{{ store.store_name }} ({{ store.store_code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                             <label for="store_stock_excel_file_hq" class="form-label file-upload-wrapper" id="wrapper-store-file-hq">
+                                <i class="bi bi-file-earmark-excel-fill fs-4"></i>
+                                <div>파일 선택 (매장재고 - 바코드)</div>
+                                <div class="file-status-text" id="status-store-file-hq">엑셀 파일을 선택하세요.</div>
+                            </label>
+                            <input type="file" name="excel_file" class="form-control" accept=".xlsx, .xls" required id="store_stock_excel_file_hq">
+                        </div>
+
+                        <div class="column-mapping-grid mb-3" id="grid-update-store-hq">
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_barcode_store_hq">바코드*</label>
+                                    <select id="col_barcode_store_hq" name="barcode_col" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_barcode_store_hq"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_stock_store_hq">매장재고*</label>
+                                    <select id="col_stock_store_hq" name="qty_col" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_stock_store_hq"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise me-1"></i>매장재고 수정 (바코드)</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mb-3 management-section border-danger">
+                 <div class="card-header bg-danger text-white">
+                     <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>상품 데이터 초기화 (현재 브랜드)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description text-danger">
+                        <strong>(요청) 현재 브랜드의 '상품/옵션/재고' 데이터만 삭제합니다.</strong>
+                        <span>(경고) '주문/공지/설정/계정'은 유지되지만, 현재 브랜드의 모든 '상품(Product)', '옵션(Variant)', '매장재고(StoreStock)' 기록이 영구적으로 삭제됩니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.reset_database_completely') }}" method="POST" onsubmit="return confirm('🚨🚨🚨 최종 경고! 🚨🚨🚨\n\n데이터베이스의 모든 상품, 옵션, 재고 정보가 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash3-fill me-1"></i>상품 데이터 초기화</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if current_user.is_admin and current_user.store_id %}
+            <div class="card mb-3 management-section border-warning">
+                 <div class="card-header bg-warning text-dark">
+                     <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>주문(Orders) DB 초기화 (현재 매장)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description text-danger">
+                        <strong>현재 매장의 '주문 내역'만 삭제하고 초기화합니다.</strong>
+                        <span>(경고) '상품/공지/설정'은 유지되지만, 현재 로그인한 매장의 '주문(Order)' 기록, '상품 처리' 내역이 영구적으로 삭제됩니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.reset_orders_db') }}" method="POST" 
+                          onsubmit="return confirm('🚨🚨🚨 경고! 🚨🚨🚨\n\n[상품/재고 DB]는 유지됩니다.\n하지만 [현재 매장의 모든 주문 내역]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <button type="submit" class="btn btn-warning"><i class="bi bi-trash3-fill me-1"></i>주문 DB 전체 초기화 (현재 매장)</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
+            <div class="card mb-3 management-section border-info">
+                 <div class="card-header bg-info text-dark">
+                     <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>공지사항(Announcements) DB 초기화 (현재 브랜드)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description text-info">
+                        <strong>현재 브랜드의 '공지사항'만 삭제하고 초기화합니다.</strong>
+                        <span>(경고) '상품/주문/설정'은 유지되지만, 현재 브랜드의 '공지사항' 기록이 영구적으로 삭제됩니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.reset_announcements_db') }}" method="POST" 
+                          onsubmit="return confirm('🚨 경고!\n\n[현재 브랜드의 모든 공지사항]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <button type="submit" class="btn btn-info"><i class="bi bi-trash3-fill me-1"></i>공지사항 DB 전체 초기화</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if current_user.is_super_admin %}
+            <div class="card mb-3 management-section border-danger">
+                 <div class="card-header bg-danger text-white">
+                     <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>전체 시스템 초기화 (계정 삭제)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description text-danger">
+                        <strong>모든 '브랜드/매장/유저/설정'을 삭제하고 초기화합니다.</strong>
+                        <span>(경고) 이 버튼을 누르면 이 시스템의 모든 계정 정보가 삭제됩니다. 실행 후 즉시 로그아웃되며, /register를 통해 최초 계정을 다시 생성해야 합니다.</span>
+                    </div>
+                    <form action="{{ url_for('api.reset_store_db') }}" method="POST" 
+                          onsubmit="return confirm('🚨🚨🚨 최종 경고! 🚨🚨🚨\n\n[모든 브랜드, 매장, 사용자 계정, 설정]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash3-fill me-1"></i>전체 계정 시스템 초기화</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
+    <div class="modal fade" id="edit-store-modal" tabindex="-1" aria-labelledby="editStoreModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editStoreModalLabel">매장 정보 수정</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-edit-store">
+                        <div class="mb-3">
+                            <label for="edit_store_code" class="form-label">매장 코드*</label>
+                            <input type="text" class="form-control" id="edit_store_code" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_store_name" class="form-label">매장 이름*</label>
+                            <input type="text" class="form-control" id="edit_store_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_store_phone" class="form-label">매장 연락처</label>
+                            <input type="tel" class="form-control" id="edit_store_phone">
+                        </div>
+                        <div id="edit-store-status" class="mt-2"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-edit-store">수정 완료</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if current_user.is_admin and current_user.store_id %}
+    <div class="modal fade" id="edit-staff-modal" tabindex="-1" aria-labelledby="editStaffModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editStaffModalLabel">직원 정보 수정</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-edit-staff">
+                        <div class="mb-3">
+                            <label for="edit_staff_name" class="form-label">직원 이름*</label>
+                            <input type="text" class="form-control" id="edit_staff_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_staff_position" class="form-label">직책</label>
+                            <input type="text" class="form-control" id="edit_staff_position">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_staff_contact" class="form-label">연락처</label>
+                            <input type="tel" class="form-control" id="edit_staff_contact">
+                        </div>
+                        <div id="edit-staff-status" class="mt-2"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-edit-staff">수정 완료</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="modal fade" id="verification-modal" tabindex="-1" aria-labelledby="verificationModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="verificationModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>데이터 검증: 의심 행 발견
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-secondary">
+                        <strong><span id="suspicious-count">0</span>개의 행</strong>이 일반적인 데이터 형식이 아니거나(헤더/푸터 등), 필수 값이 누락되었습니다.<br>
+                        제외할 행은 우측의 <span class="badge bg-danger">X</span> 버튼을 눌러 삭제하세요.<br>
+                        <small class="text-muted">(삭제하지 않은 행은 그대로 업로드됩니다.)</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-hover" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 60px;">행 번호</th>
+                                    <th>데이터 미리보기</th>
+                                    <th>의심 사유</th>
+                                    <th style="width: 50px;" class="text-center">제외</th>
+                                </tr>
+                            </thead>
+                            <tbody id="suspicious-rows-tbody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-verification" data-bs-dismiss="modal">취소</button>
+                    <button type="button" class="btn btn-primary" id="btn-confirm-upload">
+                        <i class="bi bi-upload me-1"></i> 검토 완료 및 업로드
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    
+    <script src="{{ url_for('static', filename='js/setting.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/stock.js') }}" defer></script>
+    
+    <script>
+        window.initialCategoryConfig = {{ category_config | tojson | safe if category_config else 'null' }};
+        
+        // [신규] 설정 파일 로드 버튼 핸들러 (템플릿에 포함)
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadSettingsBtn = document.getElementById('btn-load-settings');
+            const loadSettingsStatus = document.getElementById('load-settings-status');
+            const loadSettingsUrl = document.body.dataset.apiLoadSettingsUrl;
+
+            if (loadSettingsBtn) {
+                loadSettingsBtn.addEventListener('click', async () => {
+                    if (!confirm('서버에 저장된 브랜드 설정 파일을 로드하여 DB에 적용하시겠습니까?')) {
+                        return;
+                    }
+
+                    loadSettingsBtn.disabled = true;
+                    loadSettingsStatus.innerHTML = '<div class="alert alert-info">로딩 중...</div>';
+
+                    try {
+                        const response = await fetch(loadSettingsUrl, {
+                            method: 'POST'
+                        });
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.message || '설정 로드 실패');
+                        }
+
+                        loadSettingsStatus.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                        // 로드 성공 후 1초 뒤 새로고침하여 화면 반영
+                        setTimeout(() => window.location.reload(), 1000);
+                    } catch (error) {
+                        console.error('Settings load error:', error);
+                        loadSettingsStatus.innerHTML = `<div class="alert alert-danger">오류: ${error.message}</div>`;
+                    } finally {
+                        loadSettingsBtn.disabled = false;
+                    }
+                });
+            }
+        });
+    </script>
+
+</body>
+</html>

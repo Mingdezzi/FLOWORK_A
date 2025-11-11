@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLOWORK</title>
+    
+    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+</head>
+<body data-analyze-excel-url="{{ url_for('api.analyze_excel') }}">
+    
+    <div class="container my-4">
+        
+        {% include '_header.html' %}
+
+        {% include '_navigation.html' %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert {{ 'alert-success' if category == 'success' else ('alert-info' if category == 'info' else ('alert-warning' if category == 'warning' else 'alert-danger')) }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+
+        <hr> 
+        <div class="mb-4">
+             <h2 class="section-title"><i class="bi bi-database-gear me-2"></i>재고 데이터 관리</h2>
+
+            <div class="card mb-3 management-section">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-house-gear me-2"></i>매장재고 UPSERT (추가/수정)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="card-description">
+                        <strong>(STOCK_ST) 매장재고를 업데이트 (추가/수정) 합니다.</strong>
+                        <span>(1) '파일 선택' -> (2) 열 분석 -> (3) 7개 항목 매핑 -> (4) '검토 및 업데이트' 클릭<br>
+                        (DB에 없는 상품/옵션은 자동으로 생성되며, 기존 상품은 가격/재고가 수정됩니다.)</span>
+                    </div>
+                    
+                    <form action="{{ url_for('api.update_store_stock_excel') }}" method="POST" enctype="multipart/form-data" 
+                          class="update-stock-form" id="form-update-store"
+                          onsubmit="return confirm('엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?');">
+                        
+                        <div class="mb-3">
+                            <label for="store_stock_excel_file" class="form-label file-upload-wrapper" id="wrapper-store-file">
+                                <i class="bi bi-file-earmark-excel-fill fs-4"></i>
+                                <div>파일 선택 (매장재고)</div>
+                                <div class="file-status-text" id="status-store-file">엑셀 파일을 선택하세요.</div>
+                            </label>
+                            <input type="file" name="excel_file" class="form-control" accept=".xlsx, .xls" required id="store_stock_excel_file">
+                        </div>
+                        
+                        <div class="column-mapping-grid mb-3" id="grid-update-store" style="grid-template-columns: 1fr 1fr 1fr;">
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_pn_store">품번*</label>
+                                    <select id="col_pn_store" name="col_pn" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_pn_store"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_pname_store">품명*</label>
+                                    <select id="col_pname_store" name="col_pname" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_pname_store"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_color_store">컬러*</label>
+                                    <select id="col_color_store" name="col_color" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_color_store"></div>
+                                </div>
+                            </div>
+                             <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_size_store">사이즈*</label>
+                                    <select id="col_size_store" name="col_size" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_size_store"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_oprice_store">최초가*</label>
+                                    <select id="col_oprice_store" name="col_oprice" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_oprice_store"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_sprice_store">판매가*</label>
+                                    <select id="col_sprice_store" name="col_sprice" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_sprice_store"></div>
+                                </div>
+                            </div>
+                             <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label for="col_stock_store">매장재고*</label>
+                                    <select id="col_stock_store" name="col_store_stock" class="form-select form-select-sm" required disabled>
+                                        <option value="">-- 열 선택 --</option>
+                                    </select>
+                                    <div class="col-preview" id="preview_col_stock_store"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-wrapper mb-3" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="progress-status text-center mt-1 text-muted small">처리 중...</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise me-1"></i>검토 및 업데이트</button>
+                    </form>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="modal fade" id="verification-modal" tabindex="-1" aria-labelledby="verificationModalLabel" aria-hidden="true" data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="verificationModalLabel">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>데이터 검증: 의심 행 발견
+                        </h5>
+                        </div>
+                    <div class="modal-body">
+                        <div class="alert alert-secondary">
+                            <strong><span id="suspicious-count">0</span>개의 행</strong>이 일반적인 데이터 형식이 아니거나(헤더/푸터 등), 필수 값이 누락되었습니다.<br>
+                            제외할 행은 우측의 <span class="badge bg-danger">X</span> 버튼을 눌러 삭제하세요.<br>
+                            <small class="text-muted">(삭제하지 않은 행은 그대로 업로드 시도됩니다.)</small>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered table-hover" style="font-size: 0.85rem;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 60px;">행 번호</th>
+                                        <th>데이터 미리보기</th>
+                                        <th>의심 사유</th>
+                                        <th style="width: 50px;" class="text-center">제외</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="suspicious-rows-tbody">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-verification" data-bs-dismiss="modal">취소</button>
+                        <button type="button" class="btn btn-primary" id="btn-confirm-upload">
+                            <i class="bi bi-upload me-1"></i> 검토 완료 및 업로드
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <script src="{{ url_for('static', filename='js/stock.js') }}" defer></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "BARCODE_FORMAT": "{pn_final}{color}{size_final}",
+  "SIZE_SORT_ORDER": [
+    "XXS",
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL",
+    "XXXL"
+  ],
+  "ALLOWED_CATEGORIES": [
+    "신발",
+    "의류",
+    "용품"
+  ]
+}
