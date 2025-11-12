@@ -4,8 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let currentMode = 'sales'; // 'sales' or 'refund'
     let cart = []; 
+    let heldCart = null; // 보류된 카트 데이터
     let isOnline = false;
     let currentRefundSaleId = null;
+    let salesConfig = { amount_discounts: [] }; // 판매 설정
 
     // DOM Elements
     const dom = {
@@ -38,6 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCancelRefund: document.getElementById('btn-cancel-refund'),
         btnToggleOnline: document.getElementById('btn-toggle-online'),
         btnClearCart: document.getElementById('btn-clear-cart'),
+        
+        // [신규] 복구된 버튼들
+        btnHoldSale: document.getElementById('btn-hold-sale'),
+        btnApplyDiscount: document.getElementById('btn-apply-discount'),
 
         detailModal: new bootstrap.Modal(document.getElementById('detail-modal')),
         detailModalTitle: document.getElementById('detail-modal-title'),
@@ -46,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
         recordsModal: new bootstrap.Modal(document.getElementById('records-modal')),
         recordsModalTitle: document.getElementById('records-modal-title'),
         recordsModalTbody: document.getElementById('records-modal-tbody'),
+        
+        settingsModal: new bootstrap.Modal(document.getElementById('settings-modal')),
     };
 
     // Init Dates
@@ -56,6 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.saleDate.valueAsDate = today;
     dom.refundEnd.valueAsDate = today;
     dom.refundStart.valueAsDate = oneMonthAgo;
+    
+    // Load Settings
+    loadSettings();
 
     // Event Listeners
     dom.modeSales.addEventListener('change', () => setMode('sales'));
@@ -76,6 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.btnSubmitSale.addEventListener('click', submitSale);
     dom.btnSubmitRefund.addEventListener('click', submitRefund);
     dom.btnCancelRefund.addEventListener('click', resetRefund);
+    
+    // [신규] 버튼 리스너 추가
+    dom.btnHoldSale.addEventListener('click', toggleHoldSale);
+    dom.btnApplyDiscount.addEventListener('click', applyAutoDiscount);
+    
+    document.getElementById('btn-save-settings').addEventListener('click', async () => {
+        await loadSettings();
+        dom.settingsModal.hide();
+    });
 
     function setMode(mode) {
         currentMode = mode;
@@ -95,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.dateAreaSales.style.display = 'none';
             dom.dateAreaRefund.style.display = 'block';
             dom.salesActions.style.display = 'none';
-            dom.refundActions.style.display = 'flex'; // flex로 표시
+            dom.refundActions.style.display = 'flex';
             document.getElementById('right-panel-title').innerHTML = '<i class="bi bi-arrow-return-left"></i> 환불 목록';
         }
     }
@@ -104,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = dom.searchInput.value.trim();
         if (!query) return;
 
-        // 좌측 테이블 헤더 설정
         if (currentMode === 'sales') {
             dom.leftThead.innerHTML = `<tr><th>품번</th><th>품명</th><th>컬러</th><th>년도</th><th>최초가</th><th>판매가</th><th>재고</th></tr>`;
         } else {
@@ -156,16 +175,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleClickResult(item) {
         if (currentMode === 'sales') {
-            // 판매모드: 상세 정보 모달 -> 카트 담기
             dom.detailModalTitle.textContent = `${item.product_name} (${item.product_number})`;
             dom.detailModalTbody.innerHTML = '<tr><td colspan="6">로딩중...</td></tr>';
             dom.detailModal.show();
 
-            // 상세 재고 조회 API 호출 (기존 product_variants 사용)
             const res = await fetch(urls.searchSalesProducts, { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ query: item.product_number, mode: 'detail_stock' }) // 상세 조회를 위한 모드
+                body: JSON.stringify({ query: item.product_number, mode: 'detail_stock' })
             });
             const data = await res.json();
             
@@ -181,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><button class="btn btn-sm btn-primary btn-add">추가</button></td>
                 `;
                 const addHandler = () => {
-                    addToCart({...item, ...v, quantity: 1}); // v contains variant_id, size, prices
+                    addToCart({...item, ...v, quantity: 1});
                     dom.detailModal.hide();
                 };
                 tr.querySelector('.btn-add').addEventListener('click', addHandler);
@@ -190,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         } else {
-            // 환불모드: 판매 기록 목록 조회
             dom.recordsModalTitle.textContent = `판매 기록: ${item.product_number} (${item.color})`;
             dom.recordsModalTbody.innerHTML = '<tr><td colspan="8">조회중...</td></tr>';
             dom.recordsModal.show();
@@ -241,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.status === 'success') {
             currentRefundSaleId = saleId;
             dom.refundTargetInfo.textContent = receiptNumber;
-            // 환불 카트 로드 (할인 정보 등 포함)
             cart = data.items.map(i => ({
                 variant_id: i.variant_id,
                 product_name: i.name,
@@ -249,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: i.color,
                 size: i.size,
                 original_price: i.original_price || i.price,
-                sale_price: i.price, // 단위 판매가
+                sale_price: i.price,
                 discount_amount: i.discount_amount,
                 quantity: i.quantity
             }));
@@ -258,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addToCart(item) {
-        // item: variant_id, product_name, product_number, color, size, original_price, sale_price, discount_amount(def 0)
         const existing = cart.find(c => c.variant_id === item.variant_id);
         if (existing) existing.quantity++;
         else {
@@ -270,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 size: item.size,
                 original_price: item.original_price,
                 sale_price: item.sale_price,
-                discount_amount: 0, // 추가 할인 초기값
+                discount_amount: 0,
                 quantity: 1
             });
         }
@@ -323,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.totalQty.textContent = totalQty;
         dom.totalAmount.textContent = totalAmt.toLocaleString();
 
-        // Event Listeners for Inputs
         dom.cartTbody.querySelectorAll('.qty-input').forEach(el => {
             el.addEventListener('change', (e) => {
                 const i = e.target.dataset.idx;
@@ -345,8 +358,68 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+    
+    // [신규] 판매보류 기능
+    function toggleHoldSale() {
+        if (heldCart) {
+            // 복원
+            if (confirm('보류된 판매 목록을 복원하시겠습니까? (현재 작성 중인 내용은 사라집니다.)')) {
+                cart = JSON.parse(heldCart);
+                heldCart = null;
+                dom.btnHoldSale.innerHTML = '<i class="bi bi-pause-circle"></i> 판매보류';
+                dom.btnHoldSale.classList.remove('btn-danger');
+                dom.btnHoldSale.classList.add('btn-warning');
+                renderCart();
+            }
+        } else {
+            // 보류
+            if (cart.length === 0) return alert('보류할 상품이 없습니다.');
+            heldCart = JSON.stringify(cart);
+            cart = [];
+            dom.btnHoldSale.innerHTML = '<i class="bi bi-play-circle"></i> 보류중 (복원)';
+            dom.btnHoldSale.classList.remove('btn-warning');
+            dom.btnHoldSale.classList.add('btn-danger');
+            renderCart();
+        }
+    }
+    
+    // [신규] 자동 할인 적용 기능 (규칙 기반)
+    function applyAutoDiscount() {
+        if (cart.length === 0) return alert('상품이 없습니다.');
+        
+        let currentTotal = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0);
+        let appliedRule = null;
+        
+        if (salesConfig.amount_discounts) {
+            // 할인 금액이 큰 순서대로 정렬
+            const rules = salesConfig.amount_discounts.sort((a, b) => b.limit - a.limit);
+            for (const rule of rules) {
+                if (currentTotal >= rule.limit) {
+                    appliedRule = rule;
+                    break;
+                }
+            }
+        }
+        
+        if (appliedRule) {
+            alert(`${appliedRule.limit.toLocaleString()}원 이상 구매: ${appliedRule.discount.toLocaleString()}원 할인이 적용됩니다.`);
+            // 첫 번째 상품에 몰아서 할인 적용 (단순화)
+            // 실제로는 분배 로직이 더 좋을 수 있으나, 기존 로직을 따름
+            cart[0].discount_amount += appliedRule.discount;
+            renderCart();
+        } else {
+            alert('적용 가능한 할인 규칙이 없습니다.');
+        }
+    }
 
-    // API Submission Functions
+    async function loadSettings() {
+        try {
+            const res = await fetch(urls.salesSettings);
+            const data = await res.json();
+            if (data.status === 'success') salesConfig = data.config;
+        } catch (e) {}
+    }
+
     async function submitSale() {
         if (cart.length === 0) return alert('등록할 상품이 없습니다.');
         if (!confirm('판매를 등록하시겠습니까?')) return;
@@ -356,8 +429,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 items: cart.map(i => ({
                     variant_id: i.variant_id,
                     quantity: i.quantity,
-                    price: i.sale_price, // 기본 판매가
-                    discount_amount: i.discount_amount // 추가 할인액
+                    price: i.sale_price, 
+                    discount_amount: i.discount_amount 
                 })),
                 sale_date: dom.saleDate.value,
                 is_online: isOnline
