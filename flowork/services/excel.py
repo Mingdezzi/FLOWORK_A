@@ -12,6 +12,12 @@ import traceback
 import re
 import json
 
+# [추가] 변환기 임포트 (pandas 의존성 처리)
+try:
+    from flowork.services.transformer import transform_horizontal_to_vertical
+except ImportError:
+    transform_horizontal_to_vertical = None
+
 
 def _get_column_indices_from_form(form, field_map):
     column_map_letters = {}
@@ -125,95 +131,123 @@ def verify_stock_excel(file_path, form, stock_type):
 
 
 def import_excel_file(file, form, brand_id):
-    if not file or not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-        return False, '엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.', 'error'
+    if not file:
+        return False, '파일이 없습니다.', 'error'
 
     BATCH_SIZE = 500
     
     try:
-        # [수정] 브랜드 설정 로드 및 JSON 파싱
+        # 1. 브랜드 설정 로드
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
         
-        allowed_categories = []
-        if 'ALLOWED_CATEGORIES' in brand_settings:
+        # [신규 로직] 고급 변환 전략 확인 (예: 아이더)
+        import_strategy = brand_settings.get('IMPORT_STRATEGY')
+        
+        data = []
+        
+        if import_strategy == 'horizontal_matrix':
+            if transform_horizontal_to_vertical is None:
+                return False, '서버에 pandas 라이브러리가 설치되지 않아 변환 기능을 사용할 수 없습니다.', 'error'
+            
+            # JSON 설정에서 사이즈 매핑표 파싱
+            size_mapping_json = brand_settings.get('SIZE_MAPPING', '{}')
             try:
-                allowed_categories = json.loads(brand_settings['ALLOWED_CATEGORIES'])
+                size_mapping_config = json.loads(size_mapping_json)
             except json.JSONDecodeError:
-                pass
+                return False, '브랜드 설정 오류: SIZE_MAPPING 형식이 올바르지 않습니다.', 'error'
 
-        field_map = {
-            'product_number': ('col_pn', True),
-            'product_name': ('col_pname', True),
-            'release_year': ('col_year', True),
-            'item_category': ('col_category', True),
-            'color': ('col_color', True),
-            'size': ('col_size', True),
-            'original_price': ('col_oprice', False),
-            'sale_price': ('col_sprice', False),
-            'is_favorite': ('col_favorite', False),
-            'hq_stock': ('col_hq_stock', False),
-        }
-        column_map_indices = _get_column_indices_from_form(form, field_map)
+            # 변환기 실행 -> 표준 데이터 리스트 획득
+            try:
+                data = transform_horizontal_to_vertical(file, size_mapping_config)
+            except Exception as e:
+                traceback.print_exc()
+                return False, f'엑셀 변환 중 오류 발생: {e}', 'error'
+                
+        else:
+            # [기존 로직] 일반적인 엑셀 업로드 (컬럼 매핑 사용)
+            if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+                return False, '엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.', 'error'
 
-        wb = openpyxl.load_workbook(file, data_only=True)
-        ws = wb.active
+            wb = openpyxl.load_workbook(file, data_only=True)
+            ws = wb.active
+            
+            # 폼에서 컬럼 인덱스 가져오기
+            field_map = {
+                'product_number': ('col_pn', True),
+                'product_name': ('col_pname', True),
+                'release_year': ('col_year', True),
+                'item_category': ('col_category', True),
+                'color': ('col_color', True),
+                'size': ('col_size', True),
+                'original_price': ('col_oprice', False),
+                'sale_price': ('col_sprice', False),
+                'is_favorite': ('col_favorite', False),
+                'hq_stock': ('col_hq_stock', False),
+            }
+            column_map_indices = _get_column_indices_from_form(form, field_map)
+            data = _read_excel_data_by_indices(ws, column_map_indices)
 
-        data = _read_excel_data_by_indices(ws, column_map_indices)
+        # --- 이하 공통 검증 및 저장 로직 ---
 
         validated_data = []
         errors = []
         seen_barcodes = set()
 
         for i, item in enumerate(data):
-            row_num = i + 2
+            row_num = i + 2 # 엑셀 행 번호 (변환된 데이터의 경우 가상의 번호)
             
             try:
-                # [수정] 카테고리 유효성 검증 로직 추가
-                category = str(item['item_category']).strip() if item.get('item_category') else None
-                if category and allowed_categories and category not in allowed_categories:
-                    errors.append(f"{row_num}행: 허용되지 않은 품목('{category}')입니다.")
-                    continue
-
-                # [수정] 바코드 생성 시 브랜드 설정(brand_settings) 전달
+                # 바코드 생성
                 item['barcode'] = generate_barcode(item, brand_settings)
-                if not item['barcode']:
-                    errors.append(f"{row_num}행: 바코드 생성 실패 (필수 값 6개 누락 또는 포맷 오류)")
+                
+                # 변환된 데이터는 필수 값이 누락되면 바코드가 없으므로 건너뜀
+                if not item.get('barcode'):
+                    if import_strategy: continue 
+                    errors.append(f"{row_num}행: 바코드 생성 실패")
                     continue
                 
                 item['barcode_cleaned'] = clean_string_upper(item['barcode'])
-
+                
+                # 데이터 정제
                 item['product_number'] = str(item['product_number']).strip()
                 item['product_name'] = str(item['product_name']).strip()
                 item['color'] = str(item['color']).strip()
                 item['size'] = str(item['size']).strip()
                 item['original_price'] = int(item.get('original_price') or 0)
                 item['sale_price'] = int(item.get('sale_price') or item['original_price'])
+                
+                # 변환된 데이터는 release_year가 없을 수 있으므로 None 처리
                 item['release_year'] = int(item['release_year']) if item.get('release_year') else None
-                item['item_category'] = category
+                
+                item['item_category'] = str(item['item_category']).strip() if item.get('item_category') else None
                 item['is_favorite'] = 1 if item.get('is_favorite') in [True, 1, '1', 'Y', 'O'] else 0
-                item['hq_stock'] = int(item.get('hq_stock') or 0)
                 
                 item['product_number_cleaned'] = clean_string_upper(item['product_number'])
                 item['product_name_cleaned'] = clean_string_upper(item['product_name'])
                 item['product_name_choseong'] = get_choseong(item['product_name'])
                 item['color_cleaned'] = clean_string_upper(item['color'])
                 item['size_cleaned'] = clean_string_upper(item['size'])
+                
+                item['hq_stock'] = int(item.get('hq_stock') or 0) # 재고 필드 추가
 
             except (ValueError, TypeError) as e:
-                errors.append(f"{row_num}행: 데이터 타입 오류 (가격/연도) - {e}")
+                errors.append(f"{row_num}행 데이터 오류: {e}")
                 continue
 
             if item['barcode_cleaned'] in seen_barcodes:
-                errors.append(f"{row_num}행: 엑셀 내 바코드 중복 ({item['barcode']})")
+                # 일반 업로드일 때만 중복 에러 체크 (변환기는 중복이 자연스럽게 제거됨)
+                if not import_strategy:
+                    errors.append(f"{row_num}행: 바코드 중복 ({item['barcode']})")
                 continue
             seen_barcodes.add(item['barcode_cleaned'])
             
             validated_data.append(item)
             
-        if errors:
-             return False, f"데이터 검증 오류 (최대 5개 표시): {', '.join(errors[:5])}", 'error'
+        if errors and not import_strategy:
+             return False, f"검증 오류 (최대 5개): {', '.join(errors[:5])}", 'error'
 
+        # [DB 초기화 및 저장 로직]
         store_ids_to_delete = db.session.query(Store.id).filter_by(brand_id=brand_id)
         db.session.query(StoreStock).filter(StoreStock.store_id.in_(store_ids_to_delete)).delete(synchronize_session=False)
         product_ids_to_delete = db.session.query(Product.id).filter_by(brand_id=brand_id)
@@ -231,8 +265,7 @@ def import_excel_file(file, form, brand_id):
             products_to_add_batch = []
             variants_to_add_batch = []
             
-            products_map_batch = {}
-
+            # 1. Product 생성
             for item in batch_data:
                 pn_key = item['product_number_cleaned']
                 if pn_key not in products_map:
@@ -248,7 +281,6 @@ def import_excel_file(file, form, brand_id):
                         product_name_choseong=item['product_name_choseong']
                     )
                     products_map[pn_key] = product
-                    products_map_batch[pn_key] = product
                     products_to_add_batch.append(product)
 
             if products_to_add_batch:
@@ -262,12 +294,12 @@ def import_excel_file(file, form, brand_id):
                 print(f"Error flushing products batch: {e}")
                 return False, f"DB 저장 실패 (Product Flush): {e}", 'error'
             
+            # 2. Variant 생성
             for item in batch_data:
                 pn_key = item['product_number_cleaned']
                 product = products_map.get(pn_key)
                 
                 if not product or not product.id:
-                    print(f"Skipping variant, product not found or no ID: {item['product_number']}")
                     continue
                     
                 variant = Variant(
@@ -290,7 +322,7 @@ def import_excel_file(file, form, brand_id):
             
             db.session.commit()
         
-        return True, f'상품 데이터 임포트 성공. 상품 {total_products_created}건, 옵션 {total_variants_created}건이 새로 생성되었습니다. (기존 데이터 삭제됨)', 'success'
+        return True, f'업로드 완료. (상품 {total_products_created}개, 옵션 {total_variants_created}개)', 'success'
 
     except ValueError as ve:
         return False, str(ve), 'error'
@@ -306,6 +338,7 @@ def import_excel_file(file, form, brand_id):
         return False, f"엑셀 처리 중 알 수 없는 오류 발생: {e}", 'error'
 
 
+# (이하 process_stock_upsert_excel 등 기존 함수 유지)
 def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_store_id=None, progress_callback=None, excluded_row_indices=None):
     try:
         wb = openpyxl.load_workbook(file_path, data_only=True)
@@ -316,7 +349,7 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
         return 0, 0, '매장 재고를 업데이트하려면 대상 매장 ID가 필요합니다.', 'error'
 
     try:
-        # [수정] 브랜드 설정 로드
+        # 브랜드 설정 로드
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
 
@@ -411,7 +444,6 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                         pass
 
                 barcode_item = {'product_number': pn, 'color': color, 'size': size}
-                # [수정] 바코드 생성 시 설정(brand_settings) 전달
                 barcode = generate_barcode(barcode_item, brand_settings)
                 if not barcode:
                     print(f"Skipping row (barcode gen failed): {item}")
