@@ -38,6 +38,8 @@
                     </div>
                     <div class="card-body">
                         <form method="POST" action="{{ url_for('auth.register_store') }}" id="register-store-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                             <div class="mb-3">
                                 <label for="brand_id" class="form-label">브랜드 선택*</label>
                                 <select class="form-select" id="brand_id" name="brand_id" required>

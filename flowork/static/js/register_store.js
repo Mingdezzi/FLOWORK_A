@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    
+    // [수정] CSRF 토큰 가져오기 (일관성 유지를 위해 추가)
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
     const brandSelect = document.getElementById('brand_id');
     const storeSelect = document.getElementById('store_id');
     const apiBaseUrl = document.body.dataset.apiGetStoresUrl || '/api/brands/0/unregistered_stores';
@@ -25,7 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const fetchUrl = apiBaseUrl.replace('/0/', `/${brandId}/`);
 
         try {
-            const response = await fetch(fetchUrl);
+            const response = await fetch(fetchUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // [수정] CSRF 헤더 추가
+                }
+            });
             const data = await response.json();
 
             if (!response.ok || data.status === 'error') {

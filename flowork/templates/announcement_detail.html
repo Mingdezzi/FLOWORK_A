@@ -51,6 +51,7 @@
             <form method="POST" 
                   action="{{ url_for('ui.announcement_detail', id=item.id if item.id else 'new') }}" 
                   id="announcement-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
                 <div class="card-body">
                     
@@ -104,7 +105,9 @@
             </form>
             
             {% if mode == 'edit' or mode == 'view' %}
-            <form method="POST" action="{{ url_for('ui.delete_announcement', id=item.id) }}" id="delete-item-form" class="d-none"></form>
+            <form method="POST" action="{{ url_for('ui.delete_announcement', id=item.id) }}" id="delete-item-form" class="d-none">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            </form>
             
             <script>
                 // (신규) 삭제 버튼 확인

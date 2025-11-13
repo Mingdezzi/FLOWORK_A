@@ -38,6 +38,8 @@
                     </div>
                     <div class="card-body">
                         <form method="POST" action="{{ url_for('auth.register_brand') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                             <div class="mb-3">
                                 <label for="brand_name" class="form-label">브랜드 명</label>
                                 <input type="text" class="form-control" id="brand_name" name="brand_name" placeholder="예: FLOWORK" required>

@@ -410,6 +410,7 @@
                     <form action="{{ url_for('api.import_excel') }}" method="POST" enctype="multipart/form-data" 
                           class="update-stock-form" id="form-import-db"
                           onsubmit="return confirm('🚨 경고! DB를 덮어씁니다.\n현재 브랜드의 모든 상품, 옵션, 재고 데이터가 영구 삭제됩니다.\n\n정말로 계속하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         
                         <div class="mb-3">
                             <label for="db_excel_file" class="form-label file-upload-wrapper" id="wrapper-db-file">
@@ -489,6 +490,7 @@
                         <span>하단의 '데이터 동기화 실행' 버튼을 누르면, <br>DB 의 누락 된 부분을 자동으로 동기화 합니다.</span>
                     </div>
                     <form action="{{ url_for('api.sync_missing_data') }}" method="POST" onsubmit="return confirm('데이터 동기화를 실행합니다.\n비어있는 품목/년도/가격 정보가 자동으로 채워집니다.\n계속하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-info"><i class="bi bi-check2-circle me-1"></i>데이터 동기화 실행</button>
                     </form>
                 </div>
@@ -635,6 +637,7 @@
                     <form action="{{ url_for('api.update_store_stock_excel') }}" method="POST" enctype="multipart/form-data" 
                           class="update-stock-form" id="form-update-store-hq"
                           onsubmit="return confirm('엑셀 파일 기준으로 선택한 매장의 재고를 (재고만) 수정합니다.\n(바코드 2필드 기준 / 신규 상품 추가 안함)\n계속하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         
                         <div class="mb-3">
                             <label for="target_store_id" class="form-label fw-bold">업데이트 대상 매장*</label>
@@ -691,6 +694,7 @@
                         <span>(경고) '주문/공지/설정/계정'은 유지되지만, 현재 브랜드의 모든 '상품(Product)', '옵션(Variant)', '매장재고(StoreStock)' 기록이 영구적으로 삭제됩니다.</span>
                     </div>
                     <form action="{{ url_for('api.reset_database_completely') }}" method="POST" onsubmit="return confirm('🚨🚨🚨 최종 경고! 🚨🚨🚨\n\n데이터베이스의 모든 상품, 옵션, 재고 정보가 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-danger"><i class="bi bi-trash3-fill me-1"></i>상품 데이터 초기화</button>
                     </form>
                 </div>
@@ -709,6 +713,7 @@
                     </div>
                     <form action="{{ url_for('api.reset_orders_db') }}" method="POST" 
                           onsubmit="return confirm('🚨🚨🚨 경고! 🚨🚨🚨\n\n[상품/재고 DB]는 유지됩니다.\n하지만 [현재 매장의 모든 주문 내역]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-warning"><i class="bi bi-trash3-fill me-1"></i>주문 DB 전체 초기화 (현재 매장)</button>
                     </form>
                 </div>
@@ -727,6 +732,7 @@
                     </div>
                     <form action="{{ url_for('api.reset_announcements_db') }}" method="POST" 
                           onsubmit="return confirm('🚨 경고!\n\n[현재 브랜드의 모든 공지사항]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-info"><i class="bi bi-trash3-fill me-1"></i>공지사항 DB 전체 초기화</button>
                     </form>
                 </div>
@@ -745,6 +751,7 @@
                     </div>
                     <form action="{{ url_for('api.reset_store_db') }}" method="POST" 
                           onsubmit="return confirm('🚨🚨🚨 최종 경고! 🚨🚨🚨\n\n[모든 브랜드, 매장, 사용자 계정, 설정]이 영구적으로 삭제됩니다.\n\n정말로 계속 진행하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-danger"><i class="bi bi-trash3-fill me-1"></i>전체 계정 시스템 초기화</button>
                     </form>
                 </div>
@@ -875,6 +882,9 @@
             const loadSettingsBtn = document.getElementById('btn-load-settings');
             const loadSettingsStatus = document.getElementById('load-settings-status');
             const loadSettingsUrl = document.body.dataset.apiLoadSettingsUrl;
+            
+            // [수정] CSRF 토큰 가져오기
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
             if (loadSettingsBtn) {
                 loadSettingsBtn.addEventListener('click', async () => {
@@ -887,7 +897,10 @@
 
                     try {
                         const response = await fetch(loadSettingsUrl, {
-                            method: 'POST'
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                            }
                         });
                         const data = await response.json();
 

@@ -104,6 +104,7 @@
                         <span>하단의 '재고 실사 전체 초기화' 버튼을 누르면 모든 재고 실사 내역이 삭제 됩니다.</span>
                     </div>
                     <form action="{{ url_for('api.reset_actual_stock') }}" method="POST" onsubmit="return confirm('경고! 모든 상품의 실사재고 기록을 초기화(삭제)합니다.\n이 작업은 되돌릴 수 없습니다.\n계속하시겠습니까?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn reset-button"><i class="bi bi-trash3-fill me-1"></i>초기화</button>
                     </form>
                 </div>

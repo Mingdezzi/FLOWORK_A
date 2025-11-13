@@ -13,6 +13,10 @@
 })();
 
 document.addEventListener('DOMContentLoaded', (event) => {
+    
+    // [수정] CSRF 토큰 가져오기
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
     const searchInput = document.getElementById('search-query-input');
     const clearTopBtn = document.getElementById('keypad-clear-top');
     
@@ -152,7 +156,10 @@ document.addEventListener('DOMContentLoaded', (event) => {
         try {
             const response = await fetch(liveSearchUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                },
                 body: JSON.stringify({ query: query, category: category })
             });
             if (!response.ok) throw new Error('Network response was not ok');

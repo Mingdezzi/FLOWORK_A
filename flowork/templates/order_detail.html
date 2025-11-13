@@ -50,6 +50,7 @@
             <form method="POST" 
                   action="{{ url_for('ui.order_detail', order_id=order.id) if order and order.id else url_for('ui.new_order') }}" 
                   id="order-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
                 <div class="card-body" id="order-form-body">
                     
@@ -330,7 +331,9 @@
             </form>
             
             {% if order and order.id %}
-            <form method="POST" action="{{ url_for('ui.delete_order', order_id=order.id) }}" id="delete-order-form" class="d-none"></form>
+            <form method="POST" action="{{ url_for('ui.delete_order', order_id=order.id) }}" id="delete-order-form" class="d-none">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            </form>
             {% endif %}
         </div>
     </div>

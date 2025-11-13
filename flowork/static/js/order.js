@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // [수정] CSRF 토큰 가져오기
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
     const getToday = () => {
         const date = new Date();
         const year = date.getFullYear();
@@ -125,7 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(lookupUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                },
                 body: JSON.stringify({ product_number: productNumber })
             });
             const data = await response.json();
@@ -166,7 +172,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(searchUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    },
                     body: JSON.stringify({ query: query })
                 });
                 const data = await response.json();

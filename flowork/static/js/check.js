@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // [수정] CSRF 토큰 가져오기
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
     const apiFetchVariantUrl = document.body.dataset.apiFetchVariantUrl;
     const bulkUpdateActualStockUrl = document.body.dataset.bulkUpdateActualStockUrl;
 
@@ -74,7 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchAndAddItem = (barcode) => {
         fetch(apiFetchVariantUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken // [수정] 헤더 추가
+            },
             body: JSON.stringify({ barcode: barcode })
         })
         .then(response => response.json())
@@ -186,7 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             fetch(bulkUpdateActualStockUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                },
                 body: JSON.stringify({ items: itemsToSubmit })
             })
             .then(response => response.json())

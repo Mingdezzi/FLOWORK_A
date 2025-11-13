@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // [수정] CSRF 토큰 가져오기
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    
     // (신규) API URL 가져오기
     const updateStatusUrl = document.body.dataset.updateStatusUrl;
 
@@ -26,7 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // (신규) API 서버로 Fetch 요청
                 const response = await fetch(updateStatusUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    },
                     body: JSON.stringify({
                         order_id: orderId,
                         new_status: newStatus
