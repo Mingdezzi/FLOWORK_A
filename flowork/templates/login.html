@@ -38,6 +38,7 @@
                     </div>
                     <div class="card-body">
                         <form method="POST" action="{{ url_for('auth.login') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             
                             <div class="mb-3">
                                 <label for="brand_id" class="form-label">브랜드 (슈퍼 계정은 선택 안함)</label>
