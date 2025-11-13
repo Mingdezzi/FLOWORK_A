@@ -22,7 +22,8 @@ from flowork.services.db import sync_missing_data_in_db
 
 from . import api_bp
 from .utils import admin_required, _get_or_create_store_stock
-from .tasks import TASKS, run_async_stock_upsert
+# [수정] run_async_import_db 추가 임포트
+from .tasks import TASKS, run_async_stock_upsert, run_async_import_db
 
 @api_bp.route('/api/verify_excel', methods=['POST'])
 @login_required
@@ -51,9 +52,32 @@ def import_excel():
         abort(403, description="상품 DB 임포트는 본사 관리자만 가능합니다.")
         
     file = request.files.get('excel_file')
-    success, message, category = import_excel_file(file, request.form, current_user.current_brand_id)
-    flash(message, category)
-    return redirect(url_for('ui.setting_page'))
+    if not file:
+        return jsonify({'status': 'error', 'message': '파일이 없습니다.'}), 400
+
+    # [수정] 비동기 처리 로직으로 변경 (Timeout 방지)
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
+    
+    temp_filename = f"/tmp/import_{task_id}.xlsx"
+    file.save(temp_filename)
+    
+    current_brand_id = current_user.current_brand_id
+    
+    # 백그라운드 스레드 실행
+    thread = threading.Thread(
+        target=run_async_import_db,
+        args=(
+            current_app._get_current_object(), 
+            task_id, 
+            temp_filename, 
+            request.form, 
+            current_brand_id
+        )
+    )
+    thread.start()
+    
+    return jsonify({'status': 'success', 'task_id': task_id, 'message': '업로드 작업을 시작했습니다.'})
 
 @api_bp.route('/export_db_excel')
 @login_required
@@ -118,7 +142,7 @@ def update_store_stock_excel():
         task_id = str(uuid.uuid4())
         TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
         
-        temp_filename = f"verify_{task_id}.xlsx"
+        temp_filename = f"/tmp/verify_{task_id}.xlsx"
         file.save(temp_filename)
         
         thread = threading.Thread(

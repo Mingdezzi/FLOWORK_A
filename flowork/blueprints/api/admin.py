@@ -5,6 +5,7 @@ from flask import request, jsonify, current_app, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func, exc
 
+# [수정] Sale, SaleItem 모델 추가 임포트 (데이터 삭제 시 필요)
 from flowork.models import db, Brand, Store, Setting, User, Staff, Order, OrderProcessing, Announcement, ScheduleEvent, Variant, Product, StoreStock, Sale, SaleItem
 from . import api_bp
 from .utils import admin_required
