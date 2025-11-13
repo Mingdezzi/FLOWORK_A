@@ -51,7 +51,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
     df_merged = pd.concat([extracted_data, df_stock[size_cols]], axis=1)
 
     # -------------------------------------------------------------------------
-    # [수정됨] 로직 1: 사이즈 분류용 키 결정 (사용자 수식 100% 반영)
+    # [로직 1] 사이즈 분류용 키 결정 (사용자 수식 100% 반영)
     # -------------------------------------------------------------------------
     def get_size_mapping_key(row):
         # 1. 품번 가져오기
@@ -94,9 +94,8 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         if code == "3":
             if gender == "M": return "남성하의"
             if gender == "W": return "여성하의"
-            # JSON 설정 파일에 '남녀공용하의' 키가 없다면 '남성하의'로 매핑 (안전장치)
-            if gender == "U": return "남성하의" 
-            return "남성하의" # 기본값 (바지)
+            if gender == "U": return "남성하의" # 남녀공용 -> 남성하의 (기본)
+            return "남성하의" # 기본값
 
         # 위 규칙에 해당하지 않으면 엑셀의 '품목' 값 사용 (보조)
         category_val = str(row.get('item_category', '')).strip()
@@ -109,6 +108,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
     # [로직 2] DB 저장용 품목 결정 (JSON 규칙 우선)
     # -------------------------------------------------------------------------
     def get_db_item_category(row):
+        # JSON 규칙이 있으면 그것을 따름
         if category_mapping_config:
             product_code = str(row.get('product_number', '')).strip()
             target_index = category_mapping_config.get('INDEX', 5)
@@ -119,6 +119,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             code_char = product_code[target_index]
             return mapping_map.get(code_char, default_value)
         
+        # 규칙이 없으면 엑셀 값 사용
         mapped_val = row.get('item_category')
         return str(mapped_val).strip() if mapped_val else '기타'
 
@@ -137,7 +138,9 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
     )
 
     df_melted['Quantity'] = pd.to_numeric(df_melted['Quantity'], errors='coerce').fillna(0).astype(int)
-    df_melted = df_melted[df_melted['Quantity'] > 0]
+    
+    # [수정] 재고가 0이어도 상품 정보를 등록하기 위해 필터링 로직 제거
+    # df_melted = df_melted[df_melted['Quantity'] > 0] 
 
     # 5. 사이즈 매핑
     def get_real_size(row):
@@ -155,6 +158,8 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         return "Unknown"
 
     df_melted['Real_Size'] = df_melted.apply(get_real_size, axis=1)
+    
+    # "Unknown" 사이즈(매핑 규칙에 없는 사이즈 코드)는 제거 (유효한 사이즈 옵션만 남김)
     df_final = df_melted[df_melted['Real_Size'] != "Unknown"]
 
     # 6. 결과 반환
@@ -179,7 +184,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             'hq_stock': int(row.get('Quantity', 0)),
             'sale_price': sp,
             'original_price': op,
-            'item_category': str(row.get('DB_Category', '기타')),
+            'item_category': str(row.get('DB_Category', '기타')), 
             'release_year': ry,
             'is_favorite': 0
         }
