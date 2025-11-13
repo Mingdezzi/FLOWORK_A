@@ -5,7 +5,6 @@ from flask import request, jsonify, current_app, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
 from sqlalchemy import func, exc
 
-# [수정] Sale, SaleItem 모델 추가 임포트
 from flowork.models import db, Brand, Store, Setting, User, Staff, Order, OrderProcessing, Announcement, ScheduleEvent, Variant, Product, StoreStock, Sale, SaleItem
 from . import api_bp
 from .utils import admin_required
@@ -645,20 +644,21 @@ def reset_database_completely():
         abort(403, description="상품 데이터 초기화는 본사 관리자만 가능합니다.")
         
     try:
-        print("Deleting Product/Variant/StoreStock/Sales tables...")
-        engine = db.get_engine(bind=None)
+        print("Resetting Product/Variant/StoreStock/Sales data...")
         
-        # [수정] SaleItem, Sale을 목록에 추가 (참조 역순으로 삭제)
-        tables_to_drop = [
-            SaleItem.__table__,
-            Sale.__table__,
-            StoreStock.__table__, 
-            Variant.__table__, 
-            Product.__table__
-        ]
+        # [수정] 1. 주문(Order) 테이블에서 상품 참조 해제 (주문 내역 보존)
+        # 상품 삭제 시 외래키 오류 방지 및 내역 보존을 위해 product_id를 NULL로 업데이트
+        db.session.query(Order).update({Order.product_id: None})
         
-        db.Model.metadata.drop_all(bind=engine, tables=tables_to_drop, checkfirst=True)
-        db.Model.metadata.create_all(bind=engine, tables=tables_to_drop, checkfirst=True)
+        # [수정] 2. 테이블 데이터 삭제 (DROP 대신 DELETE 사용하여 외래키 제약 조건 우회 및 순차 삭제)
+        # 자식 테이블부터 부모 테이블 순으로 삭제: SaleItem -> Sale -> StoreStock -> Variant -> Product
+        db.session.query(SaleItem).delete()
+        db.session.query(Sale).delete()
+        db.session.query(StoreStock).delete()
+        db.session.query(Variant).delete()
+        db.session.query(Product).delete()
+        
+        db.session.commit()
         
         flash('상품 데이터 초기화 완료. (상품/옵션/재고/매출 데이터 삭제됨. 계정/주문 내역 보존)', 'success')
     except Exception as e:
