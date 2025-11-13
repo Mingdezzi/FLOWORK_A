@@ -210,11 +210,18 @@ def update_hq_stock_excel():
 @api_bp.route('/export_stock_check')
 @login_required
 def export_stock_check():
-    if not current_user.store_id:
-        abort(403, description="재고 실사 엑셀 출력은 매장 계정만 사용할 수 있습니다.")
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin: 
+        target_store_id = request.args.get('target_store_id', type=int)
+        
+    if not target_store_id:
+        abort(403, description="매장 정보를 확인할 수 없습니다.")
     
     output, download_name, error_message = export_stock_check_excel(
-        current_user.store_id, 
+        target_store_id, 
         current_user.current_brand_id
     )
     
@@ -307,11 +314,18 @@ def live_search():
 @api_bp.route('/reset_actual_stock', methods=['POST'])
 @login_required
 def reset_actual_stock():
-    if not current_user.store_id:
-        abort(403, description="실사 재고 초기화는 매장 계정만 사용할 수 있습니다.")
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin:
+        target_store_id = request.form.get('target_store_id', type=int)
+        
+    if not target_store_id:
+        abort(403, description="초기화할 매장 정보를 확인할 수 없습니다.")
 
     try: 
-        store_stock_ids_query = db.session.query(StoreStock.id).filter_by(store_id=current_user.store_id)
+        store_stock_ids_query = db.session.query(StoreStock.id).filter_by(store_id=target_store_id)
         
         stmt = db.update(StoreStock).where(
             StoreStock.id.in_(store_stock_ids_query)
@@ -323,7 +337,8 @@ def reset_actual_stock():
     except Exception as e: 
         db.session.rollback()
         flash(f'초기화 오류: {e}', 'error')
-    return redirect(url_for('ui.check_page'))
+        
+    return redirect(url_for('ui.check_page', target_store_id=target_store_id if not current_user.store_id else None))
 
 @api_bp.route('/api/analyze_excel', methods=['POST'])
 @login_required
@@ -374,10 +389,17 @@ def analyze_excel():
 @api_bp.route('/bulk_update_actual_stock', methods=['POST'])
 @login_required
 def bulk_update_actual_stock():
-    if not current_user.store_id:
-        abort(403, description="실사 재고 일괄 업데이트는 매장 계정만 사용할 수 있습니다.")
-        
     data = request.json
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin:
+        target_store_id = data.get('target_store_id')
+        
+    if not target_store_id:
+        return jsonify({'status': 'error', 'message': '매장 정보를 확인할 수 없습니다.'}), 400
+        
     items = data.get('items', [])
     if not items: 
         return jsonify({'status': 'error', 'message': '전송 상품 없음.'}), 400
@@ -403,7 +425,7 @@ def bulk_update_actual_stock():
             return jsonify({'status': 'error', 'message': 'DB에 일치하는 상품이 없습니다.'}), 404
 
         existing_stock = db.session.query(StoreStock).filter(
-            StoreStock.store_id == current_user.store_id,
+            StoreStock.store_id == target_store_id,
             StoreStock.variant_id.in_(variant_id_map.values())
         ).all()
         
@@ -418,7 +440,7 @@ def bulk_update_actual_stock():
                 updated += 1
             else:
                 new_stock = StoreStock(
-                    store_id=current_user.store_id,
+                    store_id=target_store_id,
                     variant_id=variant_id,
                     quantity=0,
                     actual_stock=new_actual_qty
@@ -442,10 +464,17 @@ def bulk_update_actual_stock():
 @api_bp.route('/api/fetch_variant', methods=['POST'])
 @login_required
 def api_fetch_variant():
-    if not current_user.store_id:
-        abort(403, description="바코드 조회는 매장 계정만 사용할 수 있습니다.")
-
     data = request.json
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin:
+        target_store_id = data.get('target_store_id')
+        
+    if not target_store_id:
+        return jsonify({'status': 'error', 'message': '매장 정보를 확인할 수 없습니다.'}), 400
+
     barcode = data.get('barcode', '')
     if not barcode: 
         return jsonify({'status': 'error', 'message': '바코드 없음.'}), 400
@@ -464,7 +493,7 @@ def api_fetch_variant():
         
         stock = db.session.query(StoreStock).filter_by(
             variant_id=v.id,
-            store_id=current_user.store_id
+            store_id=target_store_id
         ).first()
         
         current_stock_qty = stock.quantity if stock else 0
@@ -512,10 +541,17 @@ def search_product_by_prefix():
 @api_bp.route('/update_stock', methods=['POST'])
 @login_required
 def update_stock():
-    if not current_user.store_id:
-        abort(403, description="재고 수정은 매장 계정만 사용할 수 있습니다.")
-
     data = request.json
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin:
+        target_store_id = data.get('target_store_id')
+        
+    if not target_store_id:
+        return jsonify({'status': 'error', 'message': '매장 정보를 확인할 수 없습니다.'}), 400
+
     barcode = data.get('barcode')
     change = data.get('change')
     if not barcode or change is None: 
@@ -534,7 +570,7 @@ def update_stock():
         if variant is None:
             return jsonify({'status': 'error', 'message': '상품(바코드) 없음.'}), 404
         
-        stock = _get_or_create_store_stock(variant.id, current_user.store_id)
+        stock = _get_or_create_store_stock(variant.id, target_store_id)
         
         new_stock = max(0, stock.quantity + change)
         stock.quantity = new_stock
@@ -581,10 +617,17 @@ def toggle_favorite():
 @api_bp.route('/update_actual_stock', methods=['POST'])
 @login_required
 def update_actual_stock():
-    if not current_user.store_id:
-        abort(403, description="실사 재고 수정은 매장 계정만 사용할 수 있습니다.")
-
     data = request.json
+    target_store_id = None
+    
+    if current_user.store_id:
+        target_store_id = current_user.store_id
+    elif current_user.is_admin:
+        target_store_id = data.get('target_store_id')
+        
+    if not target_store_id:
+        return jsonify({'status': 'error', 'message': '매장 정보를 확인할 수 없습니다.'}), 400
+
     barcode = data.get('barcode')
     actual_str = data.get('actual_stock')
     if not barcode: 
@@ -604,7 +647,7 @@ def update_actual_stock():
         if variant is None:
             return jsonify({'status': 'error', 'message': '상품(바코드) 없음.'}), 404
 
-        stock = _get_or_create_store_stock(variant.id, current_user.store_id)
+        stock = _get_or_create_store_stock(variant.id, target_store_id)
         
         stock.actual_stock = actual
         db.session.commit()

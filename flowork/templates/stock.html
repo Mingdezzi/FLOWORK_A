@@ -42,6 +42,21 @@
                           class="update-stock-form" id="form-update-store"
                           onsubmit="return confirm('엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?');">
                         
+                        {% if not current_user.store_id %}
+                        <div class="mb-3 p-3 bg-light border rounded">
+                            <label for="target_store_id_main" class="form-label fw-bold text-primary">
+                                <i class="bi bi-shop me-1"></i>업데이트 대상 매장 선택 (본사 관리자)
+                            </label>
+                            <select class="form-select" id="target_store_id_main" name="target_store_id" required>
+                                <option value="">-- 재고를 넣을 매장을 선택하세요 --</option>
+                                {% for store in all_stores %}
+                                <option value="{{ store.id }}">{{ store.store_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text text-muted">* 선택한 매장의 재고로 반영됩니다.</div>
+                        </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label for="store_stock_excel_file" class="form-label file-upload-wrapper" id="wrapper-store-file">
                                 <i class="bi bi-file-earmark-excel-fill fs-4"></i>
@@ -132,6 +147,7 @@
                 </div>
             </div>
             
+            {% if not current_user.store_id %}
             <div class="card mb-3 management-section">
                 <div class="card-header">
                     <h3 class="mb-0"><i class="bi bi-database-fill-down me-2"></i>상품 데이터 전체 업로드 (DB 초기화)</h3>
@@ -225,7 +241,9 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
             
+            {% if not current_user.store_id %}
             <div class="card mb-3 management-section">
                 <div class="card-header">
                     <h3 class="mb-0"><i class="bi bi-house-gear me-2"></i>매장재고 엑셀 업로드 (본사 전용)</h3>
@@ -244,7 +262,10 @@
                             <label for="target_store_id" class="form-label fw-bold">업데이트 대상 매장*</label>
                             <select class="form-select" id="target_store_id" name="target_store_id" required>
                                 <option value="">-- 재고를 적용할 매장을 선택하세요 --</option>
-                                </select>
+                                {% for store in all_stores %}
+                                <option value="{{ store.id }}">{{ store.store_name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <hr>
                         <div class="mb-3">
@@ -281,7 +302,9 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
             
+            {% if not current_user.store_id %}
             <div class="card mb-3 management-section border-danger">
                  <div class="card-header bg-danger text-white">
                      <h3 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>상품 데이터 초기화 (현재 브랜드)</h3>
@@ -296,6 +319,7 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
 
         </div>
 
