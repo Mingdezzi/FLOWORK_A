@@ -31,7 +31,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         'original_price': column_map_indices.get('original_price'),
         'sale_price': column_map_indices.get('sale_price'),
         'release_year': column_map_indices.get('release_year'),
-        'item_category': column_map_indices.get('item_category'), # 사용자가 선택한 '구분' 열
+        'item_category': column_map_indices.get('item_category'), 
     }
 
     total_cols = len(df_stock.columns)
@@ -51,38 +51,64 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
     df_merged = pd.concat([extracted_data, df_stock[size_cols]], axis=1)
 
     # -------------------------------------------------------------------------
-    # [로직 1] 사이즈 분류용 키 결정 (사용자 선택 열 + 품번 보조)
+    # [수정됨] 로직 1: 사이즈 분류용 키 결정 (사용자 수식 100% 반영)
     # -------------------------------------------------------------------------
     def get_size_mapping_key(row):
-        # 사용자가 매핑한 '구분' 열의 값을 가져옵니다.
-        category_val = str(row.get('item_category', '')).strip()
-        if category_val == 'nan' or category_val == 'None': category_val = ''
-        
-        product_code = str(row.get('product_number', '')).strip()
-        
-        # 보조 로직: 품번으로 키즈/성별 판단
-        if product_code.startswith('J'): return '키즈'
-        
-        gender_code = product_code[1] if len(product_code) > 1 else ''
-        item_type_code = product_code[2] if len(product_code) > 2 else ''
+        # 1. 품번 가져오기
+        pn = str(row.get('product_number', '')).strip().upper()
+        if not pn: return '기타'
 
-        if '하의' in category_val or item_type_code == '3':
-            if gender_code == 'M': return '남성하의'
-            elif gender_code == 'W': return '여성하의'
-            elif gender_code == 'U': return '남성하의'
+        # 2. 수식에 따른 변수 정의
+        # first: 첫 글자 (LEFT 1)
+        first = pn[0] if len(pn) > 0 else ''
+        # gender: 두 번째 글자 (MID 2, 1)
+        gender = pn[1] if len(pn) > 1 else ''
+        # code: 여섯 번째 글자 (MID 6, 1) -> 파이썬 인덱스 5
+        code = pn[5] if len(pn) > 5 else ''
+
+        # 3. 사용자 수식 로직 구현
+        if first == "J":
+            return "키즈"
         
-        if '상의' in category_val or item_type_code in ['1', '2', '4', '5', '6']: return '상의'
-        elif '신발' in category_val or 'G' in product_code or 'N' in product_code: return '신발'
+        if code in ["1", "2", "4", "5", "6", "M", "7"]:
+            return "상의"
         
-        # 매칭되는 특수 로직이 없으면, 엑셀에 적힌 값('모자', '장갑' 등)을 그대로 반환
-        return category_val if category_val else '기타'
+        if code in ["G", "N"]:
+            return "신발"
+        
+        if code == "C":
+            return "모자"
+        
+        if code == "S":
+            return "양말"
+        
+        if code in ["B", "T"]:
+            return "가방스틱" # JSON에 "가방스틱" 키가 있어야 함
+        
+        if code == "V":
+            return "장갑"
+        
+        if code in ["A", "8", "9"]:
+            return "기타"
+        
+        if code == "3":
+            if gender == "M": return "남성하의"
+            if gender == "W": return "여성하의"
+            # JSON 설정 파일에 '남녀공용하의' 키가 없다면 '남성하의'로 매핑 (안전장치)
+            if gender == "U": return "남성하의" 
+            return "남성하의" # 기본값 (바지)
+
+        # 위 규칙에 해당하지 않으면 엑셀의 '품목' 값 사용 (보조)
+        category_val = str(row.get('item_category', '')).strip()
+        if category_val and category_val != 'nan' and category_val != 'None':
+             return category_val
+             
+        return "기타"
 
     # -------------------------------------------------------------------------
     # [로직 2] DB 저장용 품목 결정 (JSON 규칙 우선)
     # -------------------------------------------------------------------------
     def get_db_item_category(row):
-        # JSON에 규칙(CATEGORY_MAPPING_RULE)이 있다면 무조건 그 규칙을 따릅니다.
-        # (사용자가 선택한 '구분' 열은 무시하고, 품번 6번째 자리로 결정)
         if category_mapping_config:
             product_code = str(row.get('product_number', '')).strip()
             target_index = category_mapping_config.get('INDEX', 5)
@@ -93,7 +119,6 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             code_char = product_code[target_index]
             return mapping_map.get(code_char, default_value)
         
-        # 규칙이 없는 브랜드라면, 사용자가 매핑한 값을 그대로 사용
         mapped_val = row.get('item_category')
         return str(mapped_val).strip() if mapped_val else '기타'
 
@@ -154,7 +179,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             'hq_stock': int(row.get('Quantity', 0)),
             'sale_price': sp,
             'original_price': op,
-            'item_category': str(row.get('DB_Category', '기타')), # 규칙으로 생성된 품목
+            'item_category': str(row.get('DB_Category', '기타')),
             'release_year': ry,
             'is_favorite': 0
         }
