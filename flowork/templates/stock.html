@@ -82,10 +82,9 @@
                             
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_size_store">사이즈{{ '*' if import_strategy != 'horizontal_matrix' else ' (자동)' }}</label>
-                                    <select id="col_size_store" name="col_size" class="form-select form-select-sm" 
-                                            {{ 'required' if import_strategy != 'horizontal_matrix' else 'disabled' }}>
-                                        <option value="">-- {{ '자동 인식' if import_strategy == 'horizontal_matrix' else '열 선택' }} --</option>
+                                    <label for="col_size_store">사이즈 (자동)</label>
+                                    <select id="col_size_store" name="col_size" class="form-select form-select-sm" disabled>
+                                        <option value="">-- 자동 인식 --</option>
                                     </select>
                                     <div class="col-preview" id="preview_col_size_store"></div>
                                 </div>
@@ -112,10 +111,9 @@
 
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_stock_store">매장재고{{ '*' if import_strategy != 'horizontal_matrix' else ' (자동)' }}</label>
-                                    <select id="col_stock_store" name="col_store_stock" class="form-select form-select-sm" 
-                                            {{ 'required' if import_strategy != 'horizontal_matrix' else 'disabled' }}>
-                                        <option value="">-- {{ '자동 인식' if import_strategy == 'horizontal_matrix' else '열 선택' }} --</option>
+                                    <label for="col_stock_store">매장재고 (자동)</label>
+                                    <select id="col_stock_store" name="col_store_stock" class="form-select form-select-sm" disabled>
+                                        <option value="">-- 자동 인식 --</option>
                                     </select>
                                     <div class="col-preview" id="preview_col_stock_store"></div>
                                 </div>
@@ -184,10 +182,9 @@
                             </div></div>
                             
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_size_db">사이즈{{ '*' if import_strategy != 'horizontal_matrix' else ' (자동)' }}</label>
-                                <select id="col_size_db" name="col_size" class="form-select form-select-sm" 
-                                        {{ 'required' if import_strategy != 'horizontal_matrix' else 'disabled' }}>
-                                    <option value="">-- {{ '자동 인식' if import_strategy == 'horizontal_matrix' else '열' }} --</option>
+                                <label for="col_size_db">사이즈 (자동)</label>
+                                <select id="col_size_db" name="col_size" class="form-select form-select-sm" disabled>
+                                    <option value="">-- 자동 인식 --</option>
                                 </select>
                                 <div class="col-preview" id="preview_col_size_db"></div>
                             </div></div>
@@ -209,13 +206,19 @@
                             </div></div>
                             
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_hq_stock_db">본사재고{{ ' (자동)' if import_strategy == 'horizontal_matrix' else '' }}</label>
-                                <select id="col_hq_stock_db" name="col_hq_stock" class="form-select form-select-sm" 
-                                        {{ 'disabled' if import_strategy == 'horizontal_matrix' else 'disabled' }}>
-                                    <option value="">-- {{ '자동 인식' if import_strategy == 'horizontal_matrix' else '열' }} --</option>
+                                <label for="col_hq_stock_db">본사재고 (자동)</label>
+                                <select id="col_hq_stock_db" name="col_hq_stock" class="form-select form-select-sm" disabled>
+                                    <option value="">-- 자동 인식 --</option>
                                 </select>
                                 <div class="col-preview" id="preview_col_hq_stock_db"></div>
                             </div></div>
+                        </div>
+
+                        <div class="progress-wrapper mb-3" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="progress-status text-center mt-1 text-muted small">처리 중...</div>
                         </div>
 
                         <button type="submit" class="btn btn-danger"><i class="bi bi-upload me-1"></i>상품 DB 전체 업로드</button>

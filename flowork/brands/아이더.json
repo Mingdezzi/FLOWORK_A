@@ -25,5 +25,7 @@
   },
   "SIZE_SORT_ORDER": [
     "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "28", "30", "32", "34", "36", "38", "90", "95", "100", "105", "110", "230", "235", "240", "245", "250", "255", "260", "265", "270", "275", "280"
-  ]
+  ],
+  "IMAGE_URL_PREFIX": "https://contents.k-village.co.kr/Prod/",
+  "IMAGE_NAMING_RULE": "{year}/D/{product_number}{color}/{product_number}{color}_DF_01.jpg"
 }

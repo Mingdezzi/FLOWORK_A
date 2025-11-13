@@ -9,5 +9,7 @@
     "XL",
     "XXL",
     "XXXL"
-  ]
+  ],
+  "IMAGE_URL_PREFIX": "https://files.ebizway.co.kr/files/10249/Style/",
+  "IMAGE_NAMING_RULE": "{product_number}"
 }

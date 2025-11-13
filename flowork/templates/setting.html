@@ -97,8 +97,8 @@
                 </div>
                 <div class="card-body">
                     <div class="card-description">
-                        <strong>상품 검색 화면의 카테고리 버튼 배치와 구성을 설정합니다.</strong>
-                        <span>원하는 만큼 버튼을 추가하고, 한 줄에 몇 개씩 보여줄지(열 개수) 설정하세요.</span>
+                        <strong>(참고) 현재는 DB의 '품목' 정보에 따라 자동으로 버튼이 생성됩니다.</strong>
+                        <span>아래 설정은 수동 모드일 때만 사용됩니다.</span>
                     </div>
                     
                     <form id="form-category-config">
@@ -167,12 +167,6 @@
                     <h3 class="mb-0"><i class="bi bi-building me-2"></i>전체 매장 관리 (가입 승인)</h3>
                 </div>
                 <div class="card-body">
-                    <div class="card-description">
-                        <strong>브랜드에 소속될 매장 목록을 미리 등록합니다.</strong>
-                        <span>매장 담당자는 로그인 페이지의 '매장 등록'을 통해 가입 신청을 할 수 있습니다.<br>
-                        '등록유무'가 O 인 매장은 가입 신청이 들어온 매장이며, '승인' 처리를 해주어야 로그인이 가능합니다.</span>
-                    </div>
-                    
                     <h5 class="section-title-sub">신규 매장 등록 (본사)</h5>
                     <form id="form-add-store" class="mb-3">
                          <div class="row g-2 mb-2 align-items-end">
@@ -309,8 +303,6 @@
                         <strong>현재 매장에 소속된 직원을 관리합니다. (스케줄 등록용)</strong>
                         <span>(이 명단은 로그인 계정과 별개입니다.)</span>
                     </div>
-                    
-                    <h5 class="section-title-sub">신규 직원 등록</h5>
                     <form id="form-add-staff" class="mb-3">
                          <div class="row g-2 mb-2 align-items-end">
                             <div class="col-md-4">
@@ -331,9 +323,7 @@
                         </button>
                     </form>
                     <div id="add-staff-status" class="mt-2 mb-3"></div>
-
                     <hr>
-                    
                     <h5 class="section-title-sub">직원 목록</h5>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover" id="all-staff-table">
@@ -475,6 +465,13 @@
                             </div></div>
                         </div>
 
+                        <div class="progress-wrapper mb-3" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="progress-status text-center mt-1 text-muted small">처리 중...</div>
+                        </div>
+
                         <button type="submit" class="btn btn-danger"><i class="bi bi-upload me-1"></i>상품 DB 전체 업로드</button>
                     </form>
                 </div>
@@ -496,51 +493,6 @@
                 </div>
             </div>
 
-            <div class="card mb-3 management-section">
-                 <div class="card-header">
-                     <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>누락 DB 수동 업로드</h3>
-                </div>
-                <div class="card-body">
-                    <div class="card-description">
-                        <strong>누락된 DB 의 항목을 수동으로 기록하여 업로드 합니다.</strong>
-                        <span>하단의 리스트에 있는 항목을 클릭 하여, 누락 된 데이터를 입력 후 저장 합니다.</span>
-                    </div>
-                    {% if missing_data_products %}
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover missing-data-table">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>품번</th>
-                                        <th>품명 (임시)</th>
-                                        <th>누락 정보</th>
-                                        <th>작업</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                {% for product in missing_data_products %}
-                                    <tr>
-                                        <td>{{ product.product_number }}</td>
-                                        <td>{{ product.product_name }}</td>
-                                        <td>
-                                            {% if not product.release_year %}년도 {% endif %}
-                                            {% if not product.item_category %}품목{% endif %}
-                                        </td>
-                                        <td>
-                                            <a href="{{ url_for('ui.product_detail', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">
-                                                수정하기 <i class="bi bi-pencil-fill ms-1"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">데이터 수정이 필요한 신규 품목이 없습니다.</p>
-                    {% endif %}
-                </div>
-            </div>
-            
             <div class="card mb-3 management-section">
                 <div class="card-header">
                     <h3 class="mb-0"><i class="bi bi-building-gear me-2"></i>본사재고 UPSERT (추가/수정)</h3>
@@ -677,6 +629,13 @@
                                     <div class="col-preview" id="preview_col_stock_store_hq"></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="progress-wrapper mb-3" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="progress-status text-center mt-1 text-muted small">처리 중...</div>
                         </div>
 
                         <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise me-1"></i>매장재고 수정 (바코드)</button>
@@ -877,13 +836,12 @@
     <script>
         window.initialCategoryConfig = {{ category_config | tojson | safe if category_config else 'null' }};
         
-        // [신규] 설정 파일 로드 버튼 핸들러 (템플릿에 포함)
+        // 설정 파일 로드 버튼 핸들러
         document.addEventListener('DOMContentLoaded', () => {
             const loadSettingsBtn = document.getElementById('btn-load-settings');
             const loadSettingsStatus = document.getElementById('load-settings-status');
             const loadSettingsUrl = document.body.dataset.apiLoadSettingsUrl;
             
-            // [수정] CSRF 토큰 가져오기
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
             if (loadSettingsBtn) {
@@ -899,7 +857,7 @@
                         const response = await fetch(loadSettingsUrl, {
                             method: 'POST',
                             headers: {
-                                'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                                'X-CSRFToken': csrfToken
                             }
                         });
                         const data = await response.json();
@@ -909,7 +867,6 @@
                         }
 
                         loadSettingsStatus.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-                        // 로드 성공 후 1초 뒤 새로고침하여 화면 반영
                         setTimeout(() => window.location.reload(), 1000);
                     } catch (error) {
                         console.error('Settings load error:', error);
