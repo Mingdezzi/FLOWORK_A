@@ -9,15 +9,12 @@ from sqlalchemy.orm import selectinload, joinedload
 import io
 from datetime import datetime
 import traceback
-import re
 import json
 
-# 변환기 임포트
 try:
     from flowork.services.transformer import transform_horizontal_to_vertical
 except ImportError:
     transform_horizontal_to_vertical = None
-
 
 def _get_column_indices_from_form(form, field_map):
     column_map_letters = {}
@@ -41,7 +38,6 @@ def _get_column_indices_from_form(form, field_map):
             
     return column_map_indices
 
-
 def _read_excel_data_by_indices(ws, column_map_indices):
     data = []
     max_col_idx = max(filter(None, column_map_indices.values())) + 1
@@ -64,7 +60,6 @@ def _read_excel_data_by_indices(ws, column_map_indices):
             
         data.append(item)
     return data
-
 
 def verify_stock_excel(file_path, form, stock_type):
     try:
@@ -129,7 +124,6 @@ def verify_stock_excel(file_path, form, stock_type):
         traceback.print_exc()
         return {'status': 'error', 'message': f"검증 중 오류: {e}"}
 
-
 def import_excel_file(file, form, brand_id, progress_callback=None):
     if not file:
         return False, '파일이 없습니다.', 'error'
@@ -137,14 +131,11 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
     BATCH_SIZE = 500
     
     try:
-        # 1. 브랜드 설정 로드
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
         
-        # 고급 변환 전략 확인
         import_strategy = brand_settings.get('IMPORT_STRATEGY')
         
-        # 2. 폼 데이터 파싱 및 열 인덱스 추출 (전략 확인 후 분기 처리)
         field_map = {
             'product_number': ('col_pn', True),
             'product_name': ('col_pname', True),
@@ -158,7 +149,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
             'hq_stock': ('col_hq_stock', False),
         }
 
-        # horizontal_matrix 전략인 경우 size와 hq_stock은 필수 아님 (자동 처리)
         if import_strategy == 'horizontal_matrix':
             field_map['size'] = ('col_size', False)
             field_map['hq_stock'] = ('col_hq_stock', False)
@@ -171,21 +161,18 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
             if transform_horizontal_to_vertical is None:
                 return False, '서버에 pandas 라이브러리가 설치되지 않아 변환 기능을 사용할 수 없습니다.', 'error'
             
-            # (1) 사이즈 매핑표 파싱
             size_mapping_json = brand_settings.get('SIZE_MAPPING', '{}')
             try:
                 size_mapping_config = json.loads(size_mapping_json)
             except json.JSONDecodeError:
                 return False, '브랜드 설정 오류: SIZE_MAPPING 형식이 올바르지 않습니다.', 'error'
 
-            # (2) 카테고리 매핑 규칙 파싱
             category_mapping_json = brand_settings.get('CATEGORY_MAPPING_RULE', '{}')
             try:
                 category_mapping_config = json.loads(category_mapping_json)
             except json.JSONDecodeError:
                 return False, '브랜드 설정 오류: CATEGORY_MAPPING_RULE 형식이 올바르지 않습니다.', 'error'
 
-            # (3) 변환기 실행 (사용자 선택 열 정보 포함하여 전달)
             try:
                 data = transform_horizontal_to_vertical(
                     file, 
@@ -198,17 +185,12 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
                 return False, f'엑셀 변환 중 오류 발생: {e}', 'error'
                 
         else:
-            # 일반적인 엑셀 업로드
-            # file 객체가 BytesIO 혹은 실제 파일인지 확인
-            # (스레드에서 넘어온 파일 핸들이면 바로 로드 가능)
             try:
                 wb = openpyxl.load_workbook(file, data_only=True)
                 ws = wb.active
                 data = _read_excel_data_by_indices(ws, column_map_indices)
             except Exception as e:
                  return False, f'엑셀 파일 읽기 오류: {e}', 'error'
-
-        # --- 이하 공통 검증 및 저장 로직 ---
 
         validated_data = []
         errors = []
@@ -218,7 +200,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
             row_num = i + 2 
             
             try:
-                # 바코드 생성
                 item['barcode'] = generate_barcode(item, brand_settings)
                 
                 if not item.get('barcode'):
@@ -228,7 +209,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
                 
                 item['barcode_cleaned'] = clean_string_upper(item['barcode'])
                 
-                # 데이터 정제
                 item['product_number'] = str(item['product_number']).strip()
                 item['product_name'] = str(item['product_name']).strip()
                 item['color'] = str(item['color']).strip()
@@ -262,7 +242,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         if errors and not import_strategy:
              return False, f"검증 오류 (최대 5개): {', '.join(errors[:5])}", 'error'
 
-        # [DB 초기화 및 저장 로직]
         store_ids_to_delete = db.session.query(Store.id).filter_by(brand_id=brand_id)
         db.session.query(StoreStock).filter(StoreStock.store_id.in_(store_ids_to_delete)).delete(synchronize_session=False)
         product_ids_to_delete = db.session.query(Product.id).filter_by(brand_id=brand_id)
@@ -278,7 +257,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         total_items = len(validated_data)
 
         for i in range(0, len(validated_data), BATCH_SIZE):
-            # 진행률 보고
             if progress_callback:
                 progress_callback(i, total_items)
 
@@ -359,8 +337,7 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         traceback.print_exc()
         return False, f"엑셀 처리 중 알 수 없는 오류 발생: {e}", 'error'
 
-
-def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_store_id=None, progress_callback=None, excluded_row_indices=None):
+def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_store_id=None, progress_callback=None, excluded_row_indices=None, allow_create=True):
     try:
         wb = openpyxl.load_workbook(file_path, data_only=True)
     except Exception as e:
@@ -370,9 +347,10 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
         return 0, 0, '매장 재고를 업데이트하려면 대상 매장 ID가 필요합니다.', 'error'
 
     try:
-        # 브랜드 설정 로드
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
+
+        import_strategy = brand_settings.get('IMPORT_STRATEGY')
 
         field_map = {
             'product_number': ('col_pn', True),
@@ -387,6 +365,11 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
             'item_category': ('col_category', False),
         }
         
+        if import_strategy == 'horizontal_matrix':
+            field_map['size'] = ('col_size', False)
+            field_map['hq_stock'] = ('col_hq_stock', False)
+            field_map['store_stock'] = ('col_store_stock', False)
+        
         active_field_map = {}
         if stock_type == 'hq':
             for k, v in field_map.items():
@@ -396,16 +379,54 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 if k not in ['hq_stock', 'release_year', 'item_category']: active_field_map[k] = v
 
         column_map_indices = _get_column_indices_from_form(form, active_field_map)
+        
         ws = wb.active
-        items_to_process = _read_excel_data_by_indices(ws, column_map_indices)
+        items_to_process = []
+
+        if import_strategy == 'horizontal_matrix':
+            if transform_horizontal_to_vertical is None:
+                return 0, 0, '서버에 pandas 라이브러리가 없어 변환 기능을 사용할 수 없습니다.', 'error'
+            
+            try:
+                size_mapping_config = json.loads(brand_settings.get('SIZE_MAPPING', '{}'))
+                category_mapping_config = json.loads(brand_settings.get('CATEGORY_MAPPING_RULE', '{}'))
+            except json.JSONDecodeError:
+                return 0, 0, '브랜드 설정 형식이 올바르지 않습니다.', 'error'
+
+            try:
+                with open(file_path, 'rb') as f:
+                    items_to_process = transform_horizontal_to_vertical(
+                        f, 
+                        size_mapping_config, 
+                        category_mapping_config,
+                        column_map_indices 
+                    )
+                
+                for item in items_to_process:
+                    qty = item.get('hq_stock') or item.get('quantity') or 0
+                    
+                    if stock_type == 'store':
+                        item['store_stock'] = qty
+                    else:
+                        item['hq_stock'] = qty
+
+            except Exception as e:
+                traceback.print_exc()
+                return 0, 0, f'엑셀 변환 중 오류 발생: {e}', 'error'
+        
+        else:
+            try:
+                items_to_process = _read_excel_data_by_indices(ws, column_map_indices)
+            except Exception as e:
+                return 0, 0, f'엑셀 파일 읽기 오류: {e}', 'error'
 
         excluded_set = set(excluded_row_indices) if excluded_row_indices else set()
         if excluded_set:
-            items_to_process = [it for it in items_to_process if it['_row_index'] not in excluded_set]
+            items_to_process = [it for it in items_to_process if it.get('_row_index') not in excluded_set]
 
         total_items = len(items_to_process)
         if total_items == 0:
-            return 0, 0, '엑셀에서 유효한 데이터를 찾을 수 없습니다. (모두 제외되었거나 비어있음)', 'warning'
+            return 0, 0, '엑셀에서 유효한 데이터를 찾을 수 없습니다.', 'warning'
 
         if progress_callback:
             progress_callback(0, total_items)
@@ -433,7 +454,6 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 ).all()
                 store_stock_map = {s.variant_id: s for s in existing_stock}
 
-
         created_product_count = 0
         created_variant_count = 0
         updated_variant_price_count = 0
@@ -451,11 +471,14 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 progress_callback(idx, total_items)
 
             try:
-                pn = str(item['product_number']).strip()
-                pname = str(item['product_name']).strip()
-                color = str(item['color']).strip()
-                size = str(item['size']).strip()
+                pn = str(item.get('product_number', '')).strip()
+                pname = str(item.get('product_name', '')).strip()
+                color = str(item.get('color', '')).strip()
+                size = str(item.get('size', '')).strip()
                 
+                if not pn or not color or not size:
+                    continue
+
                 release_year = None
                 raw_year = str(item.get('release_year', '')).replace(' ', '').replace('년', '').strip()
                 if raw_year:
@@ -467,7 +490,6 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 barcode_item = {'product_number': pn, 'color': color, 'size': size}
                 barcode = generate_barcode(barcode_item, brand_settings)
                 if not barcode:
-                    print(f"Skipping row (barcode gen failed): {item}")
                     continue
                 
                 barcode_cleaned = clean_string_upper(barcode)
@@ -475,6 +497,9 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 
                 product = product_map.get(pn_cleaned)
                 if not product:
+                    if not allow_create:
+                        continue
+                    
                     product = Product(
                         brand_id=brand_id,
                         product_number=pn,
@@ -483,7 +508,7 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                         product_name_cleaned=clean_string_upper(pname),
                         product_name_choseong=get_choseong(pname),
                         release_year=release_year, 
-                        item_category=str(item['item_category']).strip() if item.get('item_category') else None
+                        item_category=str(item.get('item_category', '')).strip() if item.get('item_category') else None
                     )
                     product_map[pn_cleaned] = product
                     new_products_to_add.append(product)
@@ -495,6 +520,9 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                 sale_price = int(item.get('sale_price') or original_price)
 
                 if not variant:
+                    if not allow_create:
+                        continue
+
                     variant = Variant(
                         product=product,
                         barcode=barcode,
@@ -511,8 +539,8 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                     new_variants_to_add.append(variant)
                     created_variant_count += 1
                 else:
-                    variant.original_price = original_price
-                    variant.sale_price = sale_price
+                    if original_price > 0: variant.original_price = original_price
+                    if sale_price > 0: variant.sale_price = sale_price
                     updated_variant_price_count += 1
                 
                 if stock_type == 'hq':
@@ -596,7 +624,6 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
         print(f"Stock UPSERT Error: {e}")
         traceback.print_exc()
         return 0, 0, f'엑셀 처리 중 오류 발생: {e}', 'error'
-
 
 def _process_stock_update_excel(file, form, stock_type, brand_id, target_store_id):
     try:
@@ -705,7 +732,6 @@ def _process_stock_update_excel(file, form, stock_type, brand_id, target_store_i
         traceback.print_exc()
         return 0, 0, f'엑셀 처리 중 오류 발생: {e}', 'error'
 
-
 def export_db_to_excel(brand_id):
     try:
         products = Product.query.filter_by(brand_id=brand_id).options(
@@ -772,7 +798,6 @@ def export_db_to_excel(brand_id):
         print(f"DB Export Error: {e}")
         traceback.print_exc()
         return None, None, f"엑셀 백업 중 오류 발생: {e}"
-
 
 def export_stock_check_excel(current_store_id, current_brand_id):
     try:

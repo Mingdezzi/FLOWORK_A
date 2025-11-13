@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import or_, delete
 from sqlalchemy.orm import selectinload
 
-from flowork.models import db, Product, Variant, StoreStock, Setting, Store, StockHistory
+from flowork.models import db, Product, Variant, StoreStock, Setting, Store
 from flowork.utils import clean_string_upper, get_choseong, generate_barcode, get_sort_key
 
 from flowork.services.excel import (
@@ -16,18 +16,13 @@ from flowork.services.excel import (
     export_db_to_excel,
     export_stock_check_excel,
     _process_stock_update_excel,
-    verify_stock_excel,
-    process_stock_upsert_excel 
+    verify_stock_excel
 )
 from flowork.services.db import sync_missing_data_in_db
 
 from . import api_bp
 from .utils import admin_required, _get_or_create_store_stock
-# [수정] tasks 모듈에서 run_async_import_db 추가 임포트
-from .tasks import TASKS, run_async_stock_upsert, run_async_import_db
-
-import openpyxl
-from openpyxl.utils import get_column_letter, column_index_from_string
+from .tasks import TASKS, run_async_stock_upsert
 
 @api_bp.route('/api/verify_excel', methods=['POST'])
 @login_required
@@ -38,7 +33,6 @@ def verify_excel_upload():
     file = request.files['excel_file']
     stock_type = request.form.get('stock_type', 'store') 
     
-    # 임시 파일 저장
     task_id = str(uuid.uuid4())
     temp_path = f"/tmp/verify_{task_id}.xlsx"
     file.save(temp_path)
@@ -57,41 +51,9 @@ def import_excel():
         abort(403, description="상품 DB 임포트는 본사 관리자만 가능합니다.")
         
     file = request.files.get('excel_file')
-    if not file:
-        return jsonify({'status': 'error', 'message': '파일이 없습니다.'}), 400
-
-    # [수정] 비동기 처리 로직으로 변경 (Timeout 방지)
-    try:
-        task_id = str(uuid.uuid4())
-        TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
-        
-        # 파일을 임시 저장 (스레드에서 읽기 위해)
-        temp_filename = f"/tmp/db_import_{task_id}.xlsx"
-        file.save(temp_filename)
-        
-        # request.form은 스레드에서 접근 불가하므로 dict로 변환
-        form_data = request.form.to_dict()
-        current_brand_id = current_user.current_brand_id
-        
-        # 백그라운드 스레드 시작
-        thread = threading.Thread(
-            target=run_async_import_db,
-            args=(
-                current_app._get_current_object(), 
-                task_id, 
-                temp_filename, 
-                form_data, 
-                current_brand_id
-            )
-        )
-        thread.start()
-        
-        # JSON 응답 반환 (프론트엔드 js/stock.js가 이를 받아 폴링 시작)
-        return jsonify({'status': 'success', 'task_id': task_id, 'message': '대용량 DB 업로드 작업을 시작했습니다.'})
-        
-    except Exception as e:
-        print(f"Error starting import task: {e}")
-        return jsonify({'status': 'error', 'message': f'작업 시작 실패: {e}'}), 500
+    success, message, category = import_excel_file(file, request.form, current_user.current_brand_id)
+    flash(message, category)
+    return redirect(url_for('ui.setting_page'))
 
 @api_bp.route('/export_db_excel')
 @login_required
@@ -132,9 +94,14 @@ def update_store_stock_excel():
          abort(403, description="매장 재고 업데이트는 매장 관리자 또는 본사 관리자만 사용할 수 있습니다.")
     
     target_store_id = None
+    allow_create = False
+
+    if current_user.is_admin and not current_user.store_id:
+        allow_create = True
     
     if current_user.store_id:
         target_store_id = current_user.store_id
+        allow_create = False
     elif 'target_store_id' in request.form:
         target_store_id = int(request.form.get('target_store_id'))
     
@@ -148,33 +115,29 @@ def update_store_stock_excel():
     excluded_indices = [int(x) for x in excluded_str.split(',')] if excluded_str else []
 
     if 'col_pn' in request.form:
-        # 대량 처리를 위해 동기식으로 호출 (타임아웃 위험이 있으면 이것도 비동기로 변경 고려 가능)
-        # 여기서는 사용자가 요청한 3개 파일 수정 범위에 집중하기 위해 그대로 둡니다.
-        try:
-            import uuid
-            task_id = str(uuid.uuid4())
-            temp_filename = f"/tmp/{task_id}.xlsx"
-            file.save(temp_filename)
-
-            processed, created, message, category = process_stock_upsert_excel(
+        task_id = str(uuid.uuid4())
+        TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
+        
+        temp_filename = f"verify_{task_id}.xlsx"
+        file.save(temp_filename)
+        
+        thread = threading.Thread(
+            target=run_async_stock_upsert,
+            args=(
+                current_app._get_current_object(), 
+                task_id, 
                 temp_filename, 
                 request.form, 
                 'store', 
                 current_brand_id, 
                 target_store_id,
-                progress_callback=None,
-                excluded_row_indices=excluded_indices
+                excluded_indices,
+                allow_create
             )
-            
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename)
-
-            return jsonify({'status': 'success', 'message': message})
-            
-        except Exception as e:
-            print(f"Store stock update error: {e}")
-            traceback.print_exc()
-            return jsonify({'status': 'error', 'message': f"업데이트 중 오류 발생: {e}"}), 500
+        )
+        thread.start()
+        
+        return jsonify({'status': 'success', 'task_id': task_id, 'message': '업데이트 작업을 시작했습니다.'})
 
     elif 'barcode_col' in request.form:
         try:
@@ -183,6 +146,7 @@ def update_store_stock_excel():
                 current_brand_id, 
                 target_store_id
             )
+            flash(message, category)
             return jsonify({'status': 'success', 'message': message})
         except Exception as e:
             return jsonify({'status': 'error', 'message': f'오류: {e}'}), 500
@@ -204,9 +168,6 @@ def update_hq_stock_excel():
     excluded_indices = [int(x) for x in excluded_str.split(',')] if excluded_str else []
 
     if 'col_pn' in request.form:
-        # 이미 비동기 처리 중인 코드 유지
-        print("Calling UPSERT (9 fields) for HQ stock (Async)...")
-        
         task_id = str(uuid.uuid4())
         TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
         
@@ -223,7 +184,8 @@ def update_hq_stock_excel():
                 'hq', 
                 current_brand_id, 
                 None,
-                excluded_indices
+                excluded_indices,
+                True
             )
         )
         thread.start()
@@ -237,6 +199,7 @@ def update_hq_stock_excel():
                 current_brand_id, 
                 None
             )
+            flash(message, category)
             return jsonify({'status': 'success', 'message': message})
         except Exception as e:
             return jsonify({'status': 'error', 'message': f'오류: {e}'}), 500
@@ -405,7 +368,6 @@ def analyze_excel():
         })
         
     except Exception as e:
-        print(f"Excel analyze error: {e}")
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': f'엑셀 파일 분석 중 오류 발생: {e}'}), 500
 
@@ -457,7 +419,7 @@ def bulk_update_actual_stock():
             else:
                 new_stock = StoreStock(
                     store_id=current_user.store_id,
-                    variant_id=variant.id,
+                    variant_id=variant_id,
                     quantity=0,
                     actual_stock=new_actual_qty
                 )
@@ -475,7 +437,6 @@ def bulk_update_actual_stock():
         return jsonify({'status': 'success', 'message': msg})
     except Exception as e: 
         db.session.rollback()
-        print(f"Bulk update error: {e}")
         return jsonify({'status': 'error', 'message': f'서버 오류: {e}'}), 500
 
 @api_bp.route('/api/fetch_variant', methods=['POST'])
@@ -577,17 +538,6 @@ def update_stock():
         
         new_stock = max(0, stock.quantity + change)
         stock.quantity = new_stock
-        
-        history = StockHistory(
-            store_id=current_user.store_id,
-            variant_id=variant.id,
-            change_type='MANUAL_UPDATE',
-            quantity_change=change,
-            current_quantity=new_stock,
-            user_id=current_user.id
-        )
-        db.session.add(history)
-        
         db.session.commit()
         
         diff = new_stock - stock.actual_stock if stock.actual_stock is not None else None
@@ -780,9 +730,11 @@ def api_update_product_details():
     except ValueError as ve:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': f'입력 값 오류: {ve}'}), 400
+    except exc.IntegrityError as ie:
+         db.session.rollback()
+         return jsonify({'status': 'error', 'message': f'데이터베이스 오류 (바코드 중복 등): {ie.orig}'}), 400
     except Exception as e:
         db.session.rollback()
-        print(f"Update product error: {e}")
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': f'서버 오류: {e}'}), 500
 
@@ -810,9 +762,12 @@ def api_delete_product(product_id):
         
         return redirect(url_for('ui.search_page'))
 
+    except exc.IntegrityError as ie:
+         db.session.rollback()
+         flash(f"삭제 실패. 이 상품을 참조하는 다른 데이터(예: 주문 내역)가 있어 삭제할 수 없습니다. (오류: {ie.orig})", 'error')
+         return redirect(url_for('ui.product_detail', product_id=product_id))
     except Exception as e:
         db.session.rollback()
-        print(f"Delete product error: {e}")
         traceback.print_exc()
         flash(f"서버 오류로 상품을 삭제하지 못했습니다: {e}", 'error')
         return redirect(url_for('ui.product_detail', product_id=product_id))
@@ -873,7 +828,6 @@ def api_find_product_details():
                 'message': f"'{pn_query}'(으)로 시작하는 상품을 찾을 수 없습니다."
             }), 404
     except Exception as e:
-        print(f"Find product details error: {e}")
         return jsonify({'status': 'error', 'message': f'서버 오류: {e}'}), 500
 
 @api_bp.route('/api/order_product_search', methods=['POST'])
@@ -908,3 +862,6 @@ def api_order_product_search():
         return jsonify({'status': 'success', 'products': results})
     else:
         return jsonify({'status': 'error', 'message': f"'{query}'(으)로 검색된 상품이 없습니다."}), 404
+
+import openpyxl
+from openpyxl.utils import get_column_letter, column_index_from_string
