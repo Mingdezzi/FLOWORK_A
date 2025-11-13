@@ -203,6 +203,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+        // [신규] DB Import 폼 처리 (검증 없이 바로 업로드 시작)
+        else if (form && formId === 'form-import-db') {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // HTML onsubmit 속성에서 confirm을 처리하므로, 여기 도달했다면 확인 누른 것임.
+                // 바로 업로드 프로세스 시작
+                const formData = new FormData(form);
+                startUploadProcess(formData);
+            });
+        }
 
         function showVerificationModal(suspiciousRows, originalFormData) {
             const modalEl = document.getElementById('verification-modal');
@@ -378,7 +389,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (submitButton) {
                 submitButton.disabled = false;
                 const isHq = formId.includes('hq');
-                submitButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i> ${isHq ? '본사재고 UPSERT' : '매장재고 업데이트'}`;
+                
+                // [수정] 버튼 텍스트 원복 로직 보완
+                if (formId === 'form-import-db') {
+                    submitButton.innerHTML = '<i class="bi bi-upload me-1"></i>상품 DB 전체 업로드';
+                } else {
+                    submitButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i> ${isHq ? '본사재고 UPSERT' : '매장재고 업데이트'}`;
+                }
             }
         }
     }
