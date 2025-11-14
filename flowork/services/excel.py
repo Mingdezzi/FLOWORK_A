@@ -614,15 +614,24 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
         
         elif stock_type == 'store':
             new_store_stock_entries = []
+            
+            # [수정] 중복 INSERT 방지를 위한 세트 (이미 처리한 variant ID 추적)
+            processed_variant_ids_in_batch = set()
+            
             for variant, store_qty in items_for_store_stock:
                 if not variant.id: 
                     continue
                 
+                # 이미 DB에 있는지 확인
                 stock_entry = store_stock_map.get(variant.id)
                 
                 if stock_entry:
                     stock_entry.quantity = store_qty
                     updated_store_stock_count += 1
+                # [수정] 이번 배치에서 이미 생성 리스트에 추가했는지 확인
+                elif variant.id in processed_variant_ids_in_batch:
+                    # 이미 추가된 경우 중복 생성을 건너뜀
+                    continue
                 else:
                     new_stock = StoreStock(
                         store_id=target_store_id,
@@ -631,6 +640,8 @@ def process_stock_upsert_excel(file_path, form, stock_type, brand_id, target_sto
                         actual_stock=None
                     )
                     new_store_stock_entries.append(new_stock)
+                    # [수정] 처리된 목록에 추가
+                    processed_variant_ids_in_batch.add(variant.id)
                     created_store_stock_count += 1
             
             if new_store_stock_entries:
