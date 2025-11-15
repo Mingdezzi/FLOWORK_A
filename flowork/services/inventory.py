@@ -346,35 +346,6 @@ def live_search():
         "has_prev": pagination.has_prev
     })
 
-@api_bp.route('/reset_actual_stock', methods=['POST'])
-@login_required
-def reset_actual_stock():
-    target_store_id = None
-    
-    if current_user.store_id:
-        target_store_id = current_user.store_id
-    elif current_user.is_admin:
-        target_store_id = request.form.get('target_store_id', type=int)
-        
-    if not target_store_id:
-        abort(403, description="초기화할 매장 정보를 확인할 수 없습니다.")
-
-    try: 
-        store_stock_ids_query = db.session.query(StoreStock.id).filter_by(store_id=target_store_id)
-        
-        stmt = db.update(StoreStock).where(
-            StoreStock.id.in_(store_stock_ids_query)
-        ).values(actual_stock=None)
-        
-        result = db.session.execute(stmt)
-        db.session.commit()
-        flash(f'실사재고 {result.rowcount}건 초기화 완료.', 'success')
-    except Exception as e: 
-        db.session.rollback()
-        flash(f'초기화 오류: {e}', 'error')
-        
-    return redirect(url_for('ui.check_page', target_store_id=target_store_id if not current_user.store_id else None))
-
 @api_bp.route('/api/analyze_excel', methods=['POST'])
 @login_required
 def analyze_excel():
