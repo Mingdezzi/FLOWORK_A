@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FLOWORK - 설정</title>
-    
     <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    
     <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
 </head>
 <body data-api-stores-url="{{ url_for('api.get_stores') }}"
       data-api-stores-add-url="{{ url_for('api.add_store') }}"
@@ -20,21 +16,16 @@
       data-api-brand-name-set-url="{{ url_for('api.update_brand_name') }}"
       data-api-load-settings-url="{{ url_for('api.load_settings_from_file') }}"
       data-api-setting-url="{{ url_for('api.update_setting') }}"
-      
       data-api-staff-add-url="{{ url_for('api.add_staff') }}"
       data-api-staff-update-url-prefix="{{ url_for('api.update_staff', staff_id=0)[:-1] }}"
       data-api-staff-delete-url-prefix="{{ url_for('api.delete_staff', staff_id=0)[:-1] }}"
-      
       data-api-store-approve-url-prefix="{{ url_for('api.approve_store', store_id=0)[:-1] }}"
       data-api-store-toggle-active-url-prefix="{{ url_for('api.toggle_store_active', store_id=0)[:-1] }}"
       data-api-store-reset-url-prefix="{{ url_for('api.reset_store_registration', store_id=0)[:-1] }}"
-      
       data-analyze-excel-url="{{ url_for('api.analyze_excel') }}">
     
     <div class="container my-4">
-        
         {% include '_header.html' %}
-
         {% include '_navigation.html' %}
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -48,328 +39,122 @@
             {% endif %}
         {% endwith %}
 
-
         <hr class="my-4">
         <div class="mb-4">
             <h2 class="section-title"><i class="bi bi-gear-fill me-2"></i>설정</h2>
 
             {% if current_user.brand_id and not current_user.store_id %}
-            
             <div class="card mb-3 management-section">
-                <div class="card-header">
-                    <h3 class="mb-0"><i class="bi bi-patch-check-fill me-2"></i>브랜드 이름 설정</h3>
-                </div>
+                <div class="card-header"><h3 class="mb-0"><i class="bi bi-patch-check-fill me-2"></i>브랜드 설정</h3></div>
                 <div class="card-body">
-                    <div class="card-description">
-                        <strong>브랜드(상호명)를 설정합니다.</strong>
-                        <span>이 이름은 SMS 발송 시 사용됩니다. (예: FLOWORK)</span>
-                    </div>
-                    <form class="input-group" id="form-brand-name">
-                        <input type="text" class="form-control" placeholder="예: FLOWORK" id="brand-name-input" value="{{ brand_name or '' }}" required>
-                        <button class="btn btn-primary" type="submit" id="btn-save-brand-name">
-                            <i class="bi bi-save-fill me-1"></i> 브랜드 이름 저장
-                        </button>
+                    <form class="input-group mb-3" id="form-brand-name">
+                        <span class="input-group-text">브랜드명</span>
+                        <input type="text" class="form-control" id="brand-name-input" value="{{ brand_name or '' }}" required>
+                        <button class="btn btn-primary" type="submit" id="btn-save-brand-name">저장</button>
                     </form>
-                    <div id="brand-name-status" class="mt-2"></div>
-                </div>
-            </div>
-
-            <div class="card mb-3 management-section border-info">
-                <div class="card-header bg-info text-dark">
-                    <h3 class="mb-0"><i class="bi bi-file-earmark-code-fill me-2"></i>브랜드 설정 파일 로드</h3>
-                </div>
-                <div class="card-body">
-                    <div class="card-description">
-                        <strong>서버에 저장된 설정 파일(JSON)을 불러와 DB에 적용합니다.</strong>
-                        <span><code>flowork/brands/{{ current_user.brand.brand_name }}.json</code> 파일을 읽습니다.<br>
-                        (바코드 규칙, 사이즈 정렬 순서, 허용 카테고리 등)</span>
+                    <div id="brand-name-status"></div>
+                    <hr>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-info btn-sm" id="btn-load-settings"><i class="bi bi-file-earmark-code"></i> 설정 파일 로드</button>
                     </div>
-                    <button class="btn btn-info" type="button" id="btn-load-settings">
-                        <i class="bi bi-cloud-upload-fill me-1"></i> 설정 파일 로드 및 적용
-                    </button>
                     <div id="load-settings-status" class="mt-2"></div>
                 </div>
             </div>
 
-            <div class="card mb-3 management-section border-primary">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0"><i class="bi bi-grid-fill me-2"></i>검색 카테고리 버튼 설정</h3>
-                </div>
-                <div class="card-body">
-                    <div class="card-description">
-                        <strong>(참고) 현재는 DB의 '품목' 정보에 따라 자동으로 버튼이 생성됩니다.</strong>
-                        <span>아래 설정은 수동 모드일 때만 사용됩니다.</span>
-                    </div>
-                    
-                    <form id="form-category-config">
-                        <div class="mb-3">
-                            <label for="cat-columns" class="form-label fw-bold">한 줄에 표시할 버튼 수 (열 개수)</label>
-                            <select id="cat-columns" class="form-select" style="max-width: 200px;">
-                                <option value="2">2개 (2열)</option>
-                                <option value="3">3개 (3열)</option>
-                                <option value="4" selected>4개 (4열 - 기본)</option>
-                                <option value="5">5개 (5열)</option>
-                                <option value="6">6개 (6열)</option>
-                                <option value="8">8개 (8열)</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">버튼 목록 구성</label>
-                            <div id="cat-buttons-container">
-                                </div>
-                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btn-add-cat-row">
-                                <i class="bi bi-plus-lg"></i> 버튼 추가
-                            </button>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary" id="btn-save-cat-config">
-                            <i class="bi bi-save-fill me-1"></i> 설정 저장
-                        </button>
-                    </form>
-                    <div id="category-config-status" class="mt-2"></div>
-                </div>
-            </div>
-            {% endif %}
-
-
-            {% if current_user.store_id %}
             <div class="card mb-3 management-section">
-                <div class="card-header">
-                    <h3 class="mb-0"><i class="bi bi-shop me-2"></i>'우리 매장' 정보</h3>
-                </div>
+                <div class="card-header"><h3 class="mb-0"><i class="bi bi-building me-2"></i>매장 관리</h3></div>
                 <div class="card-body">
-                    <div class="card-description">
-                        <strong>현재 로그인된 '우리 매장' 정보입니다.</strong>
-                        <span>'우리 매장' 정보는 '전체 매장 관리'에서 수정할 수 있습니다.</span>
-                    </div>
-                    {% set my_store = all_stores | selectattr('id', 'equalto', my_store_id) | first %}
-                    {% if my_store %}
-                    <dl class="row mb-0">
-                        <dt class="col-sm-3">매장 코드</dt>
-                        <dd class="col-sm-9">{{ my_store.store_code or '(없음)' }}</dd>
-                        <dt class="col-sm-3">매장 이름</dt>
-                        <dd class="col-sm-9">{{ my_store.store_name }}</dd>
-                        <dt class="col-sm-3">연락처</dt>
-                        <dd class="col-sm-9">{{ my_store.phone_number or '(없음)' }}</dd>
-                    </dl>
-                    {% else %}
-                    <p class="text-danger">오류: 현재 매장 정보를 찾을 수 없습니다.</p>
-                    {% endif %}
-                    <div id="my-store-status" class="mt-2"></div>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if current_user.brand_id and not current_user.store_id %}
-            <div class="card mb-3 management-section">
-                <div class="card-header">
-                    <h3 class="mb-0"><i class="bi bi-building me-2"></i>전체 매장 관리 (가입 승인)</h3>
-                </div>
-                <div class="card-body">
-                    <h5 class="section-title-sub">신규 매장 등록 (본사)</h5>
-                    <form id="form-add-store" class="mb-3">
-                         <div class="row g-2 mb-2 align-items-end">
-                            <div class="col-md-4">
-                                <label for="new_store_code" class="form-label">매장 코드*</label>
-                                <input type="text" class="form-control" id="new_store_code" placeholder="예: BS100" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="new_store_name" class="form-label">매장 이름*</label>
-                                <input type="text" class="form-control" id="new_store_name" placeholder="예: FLOWORK 부산" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="new_store_phone" class="form-label">매장 연락처</label>
-                                <input type="tel" class="form-control" id="new_store_phone" placeholder="예: 02-123-4567">
-                            </div>
-                        </div>
-                        <button class="btn btn-success" type="submit" id="btn-add-store">
-                            <i class="bi bi-plus-lg me-1"></i> 신규 매장 추가
-                        </button>
+                    <h6 class="card-subtitle mb-2 text-muted">신규 매장 등록</h6>
+                    <form id="form-add-store" class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-4"><input type="text" class="form-control" id="new_store_code" placeholder="매장코드" required></div>
+                        <div class="col-md-4"><input type="text" class="form-control" id="new_store_name" placeholder="매장이름" required></div>
+                        <div class="col-md-3"><input type="tel" class="form-control" id="new_store_phone" placeholder="연락처"></div>
+                        <div class="col-md-1"><button class="btn btn-success w-100" type="submit" id="btn-add-store"><i class="bi bi-plus-lg"></i></button></div>
                     </form>
-                    <div id="add-store-status" class="mt-2 mb-3"></div>
-
-                    <hr>
-                    
-                    <h5 class="section-title-sub">전체 매장 목록</h5>
-                    <div class="table-responsive">
+                    <div id="add-store-status" class="mb-3"></div>
+                    <h6 class="card-subtitle mb-2 text-muted">매장 목록</h6>
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                         <table class="table table-sm table-hover" id="all-stores-table">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>매장코드</th>
-                                    <th>매장이름</th>
-                                    <th>연락처</th>
-                                    <th>담당자</th>
-                                    <th>등록유무</th>
-                                    <th>승인/활성</th>
-                                    <th style="width: 150px;">작업</th>
-                                </tr>
-                            </thead>
+                            <thead class="table-light"><tr><th>코드</th><th>이름</th><th>연락처</th><th>담당자</th><th>상태</th><th>작업</th></tr></thead>
                             <tbody>
                                 {% for store in all_stores %}
                                 <tr id="store-row-{{ store.id }}">
-                                    <td data-field="code">{{ store.store_code or '' }}</td>
+                                    <td data-field="code">{{ store.store_code }}</td>
                                     <td data-field="name">{{ store.store_name }}</td>
-                                    <td data-field="phone">{{ store.phone_number or '' }}</td>
-                                    <td data-field="manager">{{ store.manager_name or '' }}</td>
-                                    
-                                    <td data-field="registered" class="text-center">
-                                        {% if store.is_registered %}
-                                            <span class="badge bg-success">O</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark">X</span>
-                                        {% endif %}
+                                    <td data-field="phone">{{ store.phone_number }}</td>
+                                    <td data-field="manager">{{ store.manager_name }}</td>
+                                    <td class="text-center">
+                                        {% if not store.is_registered %}<span class="badge bg-secondary">대기</span>
+                                        {% elif not store.is_approved %}<span class="badge bg-warning text-dark">승인대기</span>
+                                        {% elif not store.is_active %}<span class="badge bg-danger">비활성</span>
+                                        {% else %}<span class="badge bg-success">정상</span>{% endif %}
                                     </td>
-                                    
-                                    <td data-field="approved" class="text-center">
-                                        {% if not store.is_registered %}
-                                            <span class="badge bg-secondary">등록대기</span>
-                                        {% elif not store.is_approved %}
-                                            <span class="badge bg-warning text-dark">승인대기</span>
-                                        {% elif not store.is_active %}
-                                            <span class="badge bg-danger">비활성</span>
-                                        {% else %}
-                                            <span class="badge bg-info">승인(활성)</span>
-                                        {% endif %}
-                                    </td>
-                                    
                                     <td>
                                         {% if store.is_registered and not store.is_approved %}
-                                        <button class="btn btn-success btn-sm py-0 px-1 btn-approve-store"
-                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
-                                                title="가입 승인">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                        </button>
+                                        <button class="btn btn-success btn-sm py-0 px-1 btn-approve-store" data-id="{{ store.id }}" title="승인"><i class="bi bi-check"></i></button>
                                         {% endif %}
-                                        
-                                        <button class="btn btn-info btn-sm py-0 px-1 btn-edit-store" 
-                                                data-bs-toggle="modal" data-bs-target="#edit-store-modal"
-                                                data-id="{{ store.id }}"
-                                                data-code="{{ store.store_code or '' }}"
-                                                data-name="{{ store.store_name }}"
-                                                data-phone="{{ store.phone_number or '' }}"
-                                                title="매장 정보 수정">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </button>
-                                        
+                                        <button class="btn btn-info btn-sm py-0 px-1 btn-edit-store" data-bs-toggle="modal" data-bs-target="#edit-store-modal" data-id="{{ store.id }}" data-code="{{ store.store_code }}" data-name="{{ store.store_name }}" data-phone="{{ store.phone_number }}" title="수정"><i class="bi bi-pencil"></i></button>
                                         {% if store.is_registered %}
-                                        <button class="btn btn-warning btn-sm py-0 px-1 btn-reset-store"
-                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
-                                                title="등록 초기화 (매장 재가입 필요)">
-                                            <i class="bi bi-arrow-counterclockwise"></i>
-                                        </button>
+                                        <button class="btn btn-warning btn-sm py-0 px-1 btn-reset-store" data-id="{{ store.id }}" data-name="{{ store.store_name }}" title="초기화"><i class="bi bi-arrow-counterclockwise"></i></button>
                                         {% endif %}
-                                        
-                                        <button class="btn btn-secondary btn-sm py-0 px-1 btn-toggle-active-store"
-                                                data-id="{{ store.id }}" data-name="{{ store.store_name }}"
-                                                title="{{ '매장 비활성화' if store.is_active else '매장 활성화' }}">
-                                            {% if store.is_active %}
-                                                <i class="bi bi-eye-slash-fill"></i>
-                                            {% else %}
-                                                <i class="bi bi-eye-fill"></i>
-                                            {% endif %}
-                                        </button>
-
+                                        <button class="btn btn-secondary btn-sm py-0 px-1 btn-toggle-active-store" data-id="{{ store.id }}" title="활성/비활성"><i class="bi bi-eye{{ '-slash' if store.is_active else '' }}"></i></button>
                                         {% if not store.is_registered %}
-                                        <button class="btn btn-danger btn-sm py-0 px-1 btn-delete-store"
-                                                data-id="{{ store.id }}"
-                                                data-name="{{ store.store_name }}"
-                                                title="매장 삭제">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
+                                        <button class="btn btn-danger btn-sm py-0 px-1 btn-delete-store" data-id="{{ store.id }}" data-name="{{ store.store_name }}" title="삭제"><i class="bi bi-trash"></i></button>
                                         {% endif %}
                                     </td>
-                                </tr>
-                                {% else %}
-                                <tr id="no-other-stores">
-                                    <td colspan="7" class="text-center text-muted">등록된 매장이 없습니다.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    <div id="delete-store-status" class="mt-2"></div>
+                    <div id="delete-store-status"></div>
                 </div>
             </div>
             {% endif %}
 
             {% if current_user.store_id %}
             <div class="card mb-3 management-section">
-                <div class="card-header">
-                    <h3 class="mb-0"><i class="bi bi-person-badge me-2"></i>직원 명단 관리 (현재 매장)</h3>
-                </div>
+                <div class="card-header"><h3 class="mb-0"><i class="bi bi-shop me-2"></i>매장 정보</h3></div>
                 <div class="card-body">
-                    <div class="card-description">
-                        <strong>현재 매장에 소속된 직원을 관리합니다. (스케줄 등록용)</strong>
-                        <span>(이 명단은 로그인 계정과 별개입니다.)</span>
-                    </div>
-                    <form id="form-add-staff" class="mb-3">
-                         <div class="row g-2 mb-2 align-items-end">
-                            <div class="col-md-4">
-                                <label for="new_staff_name" class="form-label">직원 이름*</label>
-                                <input type="text" class="form-control" id="new_staff_name" placeholder="예: 홍길동" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="new_staff_position" class="form-label">직책</label>
-                                <input type="text" class="form-control" id="new_staff_position" placeholder="예: 매니저">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="new_staff_contact" class="form-label">연락처</label>
-                                <input type="tel" class="form-control" id="new_staff_contact" placeholder="예: 010-1234-5678">
-                            </div>
-                        </div>
-                        <button class="btn btn-success" type="submit" id="btn-add-staff">
-                            <i class="bi bi-person-plus-fill me-1"></i> 신규 직원 추가
-                        </button>
+                    {% set my_store = all_stores | selectattr('id', 'equalto', my_store_id) | first %}
+                    <dl class="row mb-0">
+                        <dt class="col-sm-2">매장명</dt><dd class="col-sm-4">{{ my_store.store_name if my_store else '' }}</dd>
+                        <dt class="col-sm-2">코드</dt><dd class="col-sm-4">{{ my_store.store_code if my_store else '' }}</dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="card mb-3 management-section">
+                <div class="card-header"><h3 class="mb-0"><i class="bi bi-person-badge me-2"></i>직원 관리</h3></div>
+                <div class="card-body">
+                    <form id="form-add-staff" class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-4"><input type="text" class="form-control" id="new_staff_name" placeholder="이름" required></div>
+                        <div class="col-md-3"><input type="text" class="form-control" id="new_staff_position" placeholder="직책"></div>
+                        <div class="col-md-4"><input type="tel" class="form-control" id="new_staff_contact" placeholder="연락처"></div>
+                        <div class="col-md-1"><button class="btn btn-success w-100" type="submit" id="btn-add-staff"><i class="bi bi-plus-lg"></i></button></div>
                     </form>
-                    <div id="add-staff-status" class="mt-2 mb-3"></div>
-                    <hr>
-                    <h5 class="section-title-sub">직원 목록</h5>
+                    <div id="add-staff-status"></div>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover" id="all-staff-table">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>직원 이름</th>
-                                    <th>직책</th>
-                                    <th>연락처</th>
-                                    <th style="width: 100px;">작업</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>이름</th><th>직책</th><th>연락처</th><th>작업</th></tr></thead>
                             <tbody>
                                 {% for staff in staff_list %}
                                 <tr id="staff-row-{{ staff.id }}">
                                     <td data-field="name">{{ staff.name }}</td>
-                                    <td data-field="position">{{ staff.position or '' }}</td>
-                                    <td data-field="contact">{{ staff.contact or '' }}</td>
+                                    <td data-field="position">{{ staff.position }}</td>
+                                    <td data-field="contact">{{ staff.contact }}</td>
                                     <td>
-                                        <button class="btn btn-info btn-sm py-0 px-1 btn-edit-staff" 
-                                                data-bs-toggle="modal" data-bs-target="#edit-staff-modal"
-                                                data-id="{{ staff.id }}"
-                                                data-name="{{ staff.name }}"
-                                                data-position="{{ staff.position or '' }}"
-                                                data-contact="{{ staff.contact or '' }}">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </button>
-                                        <button class="btn btn-danger btn-sm py-0 px-1 btn-delete-staff"
-                                                data-id="{{ staff.id }}"
-                                                data-name="{{ staff.name }}">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
+                                        <button class="btn btn-sm btn-info btn-edit-staff" data-bs-toggle="modal" data-bs-target="#edit-staff-modal" data-id="{{ staff.id }}" data-name="{{ staff.name }}" data-position="{{ staff.position }}" data-contact="{{ staff.contact }}"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-danger btn-delete-staff" data-id="{{ staff.id }}" data-name="{{ staff.name }}"><i class="bi bi-trash"></i></button>
                                     </td>
-                                </tr>
-                                {% else %}
-                                <tr id="no-staff">
-                                    <td colspan="4" class="text-center text-muted">등록된 직원이 없습니다.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    <div id="delete-staff-status" class="mt-2"></div>
+                    <div id="delete-staff-status"></div>
                 </div>
             </div>
             {% endif %}
-
 
             <hr class="my-4">
             <h2 class="section-title"><i class="bi bi-database-gear me-2"></i>DB 관리</h2>
@@ -378,27 +163,52 @@
                 <div class="card-header">
                     <ul class="nav nav-tabs card-header-tabs" id="dbManageTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="tab-orders-tab" data-bs-toggle="tab" data-bs-target="#tab-orders" type="button" role="tab">1. 주문(Orders)</button>
+                            <button class="nav-link active" id="tab-orders-tab" data-bs-toggle="tab" data-bs-target="#tab-orders" type="button">1. 주문(Orders)</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-announcements-tab" data-bs-toggle="tab" data-bs-target="#tab-announcements" type="button" role="tab">2. 공지사항(Notice)</button>
+                            <button class="nav-link" id="tab-announcements-tab" data-bs-toggle="tab" data-bs-target="#tab-announcements" type="button">2. 공지사항(Notice)</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-products-tab" data-bs-toggle="tab" data-bs-target="#tab-products" type="button" role="tab">3. 상품/재고(Product)</button>
+                            <button class="nav-link" id="tab-products-tab" data-bs-toggle="tab" data-bs-target="#tab-products" type="button">3. 상품/재고(Product)</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="tab-system-tab" data-bs-toggle="tab" data-bs-target="#tab-system" type="button" role="tab">4. 시스템(System)</button>
+                            <button class="nav-link" id="tab-system-tab" data-bs-toggle="tab" data-bs-target="#tab-system" type="button">4. 시스템(System)</button>
                         </li>
                     </ul>
                 </div>
-                <div class="card-body tab-content" id="dbManageTabContent">
+                <div class="card-body tab-content">
                     
-                    <div class="tab-pane fade show active" id="tab-orders" role="tabpanel">
-                        <h5 class="card-title mb-3">주문 데이터 관리</h5>
+                    <div class="tab-pane fade show active" id="tab-orders">
                         
-                        {% if not current_user.store_id %} <div class="alert alert-info py-2 mb-3">
-                            <i class="bi bi-info-circle me-2"></i>본사 관리자 권한으로 전체 또는 특정 매장의 주문을 관리합니다.
+                        {% if current_user.store_id %}
+                        <h5 class="card-title text-primary">[매장 관리자] 주문 데이터 관리</h5>
+                        <div class="alert alert-light border">본인 매장의 주문 내역만 관리합니다.</div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <a href="{{ url_for('api.export_orders_excel') }}?target_store_id={{ current_user.store_id }}" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-download me-2"></i>(1-1) 주문 내역 백업
+                                </a>
+                            </div>
+                            <div class="col-md-4">
+                                <form action="{{ url_for('api.import_orders_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="target_store_id" value="{{ current_user.store_id }}">
+                                    <input type="file" name="excel_file" class="form-control" required>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (1-2) 복구</button>
+                                </form>
+                            </div>
+                            <div class="col-md-4">
+                                <form action="{{ url_for('api.reset_orders_db') }}" method="POST" onsubmit="return confirm('⚠️ 본인 매장의 모든 주문 내역이 삭제됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="target_store_id" value="{{ current_user.store_id }}">
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(1-3) 초기화</button>
+                                </form>
+                            </div>
                         </div>
+                        {% endif %}
+
+                        {% if not current_user.store_id %}
+                        <h5 class="card-title text-success">[본사 관리자] 주문 데이터 관리</h5>
                         <div class="mb-3">
                             <label class="form-label fw-bold">대상 매장 선택</label>
                             <select class="form-select" id="orders_target_store">
@@ -408,76 +218,94 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        {% endif %}
-
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <div class="d-grid">
-                                    <button type="button" class="btn btn-outline-primary" onclick="downloadOrdersExcel()">
-                                        <i class="bi bi-download me-2"></i>주문 내역 백업 (엑셀)
-                                    </button>
-                                </div>
+                                <button type="button" class="btn btn-outline-primary w-100" onclick="downloadOrdersExcel()">
+                                    <i class="bi bi-download me-2"></i>(1-1) 주문 내역 백업
+                                </button>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.import_orders_excel') }}" method="POST" enctype="multipart/form-data" class="input-group" id="form-import-orders">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <form action="{{ url_for('api.import_orders_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="target_store_id" class="target-store-id-input">
                                     <input type="file" name="excel_file" class="form-control" required>
-                                    <button type="submit" class="btn btn-outline-success">
-                                        <i class="bi bi-upload"></i> 복구
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (1-2) 복구</button>
                                 </form>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_orders_db') }}" method="POST" id="form-reset-orders" onsubmit="return confirmReset('주문 내역');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <form action="{{ url_for('api.reset_orders_db') }}" method="POST" onsubmit="return confirm('⚠️ 선택된 매장의 주문 내역이 삭제됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="target_store_id" class="target-store-id-input">
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="bi bi-trash3 me-2"></i>주문 내역 초기화
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(1-3) 초기화</button>
                                 </form>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
 
-                    <div class="tab-pane fade" id="tab-announcements" role="tabpanel">
-                        <h5 class="card-title mb-3">공지사항 데이터 관리</h5>
-                        {% if not current_user.store_id %} <div class="row g-3">
+                    <div class="tab-pane fade" id="tab-announcements">
+                        {% if not current_user.store_id %}
+                        <h5 class="card-title text-success">[본사 관리자] 공지사항 관리</h5>
+                        <div class="row g-3">
                             <div class="col-md-4">
-                                <div class="d-grid">
-                                    <a href="{{ url_for('api.export_announcements_excel') }}" class="btn btn-outline-primary">
-                                        <i class="bi bi-download me-2"></i>공지사항 백업 (엑셀)
-                                    </a>
-                                </div>
+                                <a href="{{ url_for('api.export_announcements_excel') }}" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-download me-2"></i>(2-1) 공지사항 백업
+                                </a>
                             </div>
                             <div class="col-md-4">
                                 <form action="{{ url_for('api.import_announcements_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="file" name="excel_file" class="form-control" required>
-                                    <button type="submit" class="btn btn-outline-success">
-                                        <i class="bi bi-upload"></i> 복구
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (2-2) 복구</button>
                                 </form>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_announcements_db') }}" method="POST" onsubmit="return confirmReset('공지사항');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="bi bi-trash3 me-2"></i>공지사항 초기화
-                                    </button>
+                                <form action="{{ url_for('api.reset_announcements_db') }}" method="POST" onsubmit="return confirm('⚠️ 모든 공지사항이 삭제됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(2-3) 초기화</button>
                                 </form>
                             </div>
                         </div>
                         {% else %}
-                        <p class="text-muted text-center py-3">공지사항 관리는 본사 관리자 권한입니다.</p>
+                        <p class="text-muted text-center py-5">공지사항 데이터 관리는 본사 관리자 전용입니다.</p>
                         {% endif %}
                     </div>
 
-                    <div class="tab-pane fade" id="tab-products" role="tabpanel">
-                        <h5 class="card-title mb-3">상품 및 재고 데이터 관리</h5>
+                    <div class="tab-pane fade" id="tab-products">
                         
-                        {% if not current_user.store_id %} <div class="mb-4">
-                            <label class="form-label fw-bold">대상 매장 선택 (매장 재고 관리용)</label>
+                        {% if current_user.store_id %}
+                        <h5 class="card-title text-primary">[매장 관리자] 상품/재고 관리</h5>
+                        <div class="alert alert-light border">본인 매장의 재고 데이터만 관리합니다.</div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <a href="{{ url_for('api.export_stock_check') }}?target_store_id={{ current_user.store_id }}" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-download me-2"></i>(3-1) 재고 백업
+                                </a>
+                            </div>
+                            <div class="col-md-4">
+                                <form action="{{ url_for('api.update_store_stock_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="target_store_id" value="{{ current_user.store_id }}">
+                                    <input type="file" name="excel_file" class="form-control" required>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (3-2) 복구</button>
+                                </form>
+                            </div>
+                            <div class="col-md-4">
+                                <form action="{{ url_for('api.reset_actual_stock') }}" method="POST" onsubmit="return confirm('⚠️ 본인 매장의 재고가 초기화됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="target_store_id" value="{{ current_user.store_id }}">
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(3-3) 초기화</button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if not current_user.store_id %}
+                        <h5 class="card-title text-success">[본사 관리자] 상품/재고 관리</h5>
+                        
+                        <h6 class="text-muted mt-3 border-bottom pb-2">매장별 재고 관리</h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">대상 매장 선택</label>
                             <select class="form-select" id="stock_target_store">
                                 <option value="">전체 매장 (All Stores)</option>
                                 {% for store in all_stores %}
@@ -485,80 +313,63 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        {% endif %}
-
-                        <div class="row g-3 mb-4 border-bottom pb-4">
-                            <div class="col-12"><h6 class="text-muted small">매장별 재고 관리</h6></div>
+                        <div class="row g-3 mb-4">
                             <div class="col-md-4">
-                                <div class="d-grid">
-                                    <button type="button" class="btn btn-outline-primary" onclick="downloadStockExcel()">
-                                        <i class="bi bi-download me-2"></i>재고 내역 백업
-                                    </button>
-                                </div>
+                                <button type="button" class="btn btn-outline-primary w-100" onclick="downloadStockExcel()">
+                                    <i class="bi bi-download me-2"></i>(3-1) 재고 백업
+                                </button>
                             </div>
                             <div class="col-md-4">
                                 <form action="{{ url_for('api.update_store_stock_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="target_store_id" class="target-store-id-input">
                                     <input type="file" name="excel_file" class="form-control" required>
-                                    <button type="submit" class="btn btn-outline-success">
-                                        <i class="bi bi-upload"></i> 복구
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (3-2) 복구</button>
                                 </form>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_actual_stock') }}" method="POST" onsubmit="return confirmReset('재고 내역');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <form action="{{ url_for('api.reset_actual_stock') }}" method="POST" onsubmit="return confirm('⚠️ 선택 매장의 재고가 초기화됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="target_store_id" class="target-store-id-input">
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="bi bi-trash3 me-2"></i>재고 내역 초기화
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(3-3) 초기화</button>
                                 </form>
                             </div>
                         </div>
 
-                        {% if not current_user.store_id %} <div class="row g-3">
-                            <div class="col-12"><h6 class="text-muted small">본사 DB 관리 (브랜드 공통)</h6></div>
+                        <h6 class="text-muted mt-3 border-bottom pb-2">본사 DB 관리 (브랜드 공통)</h6>
+                        <div class="row g-3">
                             <div class="col-md-4">
-                                <div class="d-grid">
-                                    <a href="{{ url_for('api.export_db_excel') }}" class="btn btn-primary">
-                                        <i class="bi bi-database-down me-2"></i>본사 DB 백업
-                                    </a>
-                                </div>
+                                <a href="{{ url_for('api.export_db_excel') }}" class="btn btn-primary w-100"><i class="bi bi-database-down me-2"></i>(3-4) 본사 DB 백업</a>
                             </div>
                             <div class="col-md-4">
                                 <form action="{{ url_for('api.inventory_upsert') }}" method="POST" enctype="multipart/form-data" class="input-group">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <input type="hidden" name="upload_mode" value="db"/>
-                                    <input type="hidden" name="is_full_import" value="true"/>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="upload_mode" value="db">
+                                    <input type="hidden" name="is_full_import" value="true">
                                     <input type="file" name="excel_file" class="form-control" required>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="bi bi-database-up"></i> DB 복구(초기화)
-                                    </button>
+                                    <button type="submit" class="btn btn-success"><i class="bi bi-database-up"></i> (3-5) 복구</button>
                                 </form>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_database_completely') }}" method="POST" onsubmit="return confirmReset('본사 상품 DB 전체');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-danger w-100">
-                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>본사 DB 초기화
-                                    </button>
+                                <form action="{{ url_for('api.reset_database_completely') }}" method="POST" onsubmit="return confirm('🚨 경고: 본사 상품/옵션 DB가 완전히 삭제됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-danger w-100"><i class="bi bi-exclamation-triangle-fill me-2"></i>(3-6) DB 초기화</button>
                                 </form>
                             </div>
                         </div>
                         {% endif %}
                     </div>
 
-                    <div class="tab-pane fade" id="tab-system" role="tabpanel">
-                        <h5 class="card-title mb-3">시스템 관리</h5>
+                    <div class="tab-pane fade" id="tab-system">
                         
                         {% if current_user.store_id %}
+                        <h5 class="card-title text-primary">[매장 관리자] 시스템 관리</h5>
                         <div class="card border-danger mb-3">
                             <div class="card-body">
-                                <h6 class="text-danger">계정 초기화 및 삭제</h6>
-                                <p class="small text-muted">현재 로그인된 매장 계정의 모든 데이터를 삭제하고 계정을 초기화합니다.</p>
+                                <h6 class="text-danger">(4-1) 계정 초기화 및 삭제</h6>
+                                <p class="small text-muted">현재 로그인된 매장 계정의 모든 데이터를 삭제하고 탈퇴합니다.</p>
                                 <form action="{{ url_for('api.delete_store', store_id=current_user.store_id) }}" method="POST" onsubmit="return confirm('정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-danger">계정 삭제</button>
                                 </form>
                             </div>
@@ -566,169 +377,132 @@
                         {% endif %}
 
                         {% if current_user.brand_id and not current_user.store_id %}
+                        <h5 class="card-title text-success">[본사 관리자] 시스템 관리</h5>
+                        <h6 class="text-muted mt-3 border-bottom pb-2">매장/계정 관리</h6>
                         <div class="row g-3 mb-4">
-                            <div class="col-12"><h6 class="text-muted small">매장/계정 관리</h6></div>
                             <div class="col-md-4">
-                                <div class="d-grid">
-                                    <a href="{{ url_for('api.export_stores_excel') }}" class="btn btn-outline-primary">
-                                        <i class="bi bi-download me-2"></i>매장/계정 백업
-                                    </a>
-                                </div>
+                                <a href="{{ url_for('api.export_stores_excel') }}" class="btn btn-outline-primary w-100"><i class="bi bi-download me-2"></i>(4-1) 매장/계정 백업</a>
                             </div>
                             <div class="col-md-4">
                                 <form action="{{ url_for('api.import_stores_excel') }}" method="POST" enctype="multipart/form-data" class="input-group">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="file" name="excel_file" class="form-control" required>
-                                    <button type="submit" class="btn btn-outline-success">
-                                        <i class="bi bi-upload"></i> 복구
-                                    </button>
+                                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-upload"></i> (4-2) 복구</button>
                                 </form>
                             </div>
                             <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_store_db') }}" method="POST" onsubmit="return confirm('🚨 브랜드 내 모든 매장과 계정이 삭제됩니다. 진행하시겠습니까?');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="bi bi-trash3 me-2"></i>브랜드 전체 초기화
-                                    </button>
+                                <form action="{{ url_for('api.reset_store_db') }}" method="POST" onsubmit="return confirm('🚨 브랜드 내 모든 매장과 계정이 삭제됩니다.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-trash3 me-2"></i>(4-3) 브랜드 전체 초기화</button>
                                 </form>
                             </div>
                         </div>
                         {% endif %}
 
                         {% if current_user.is_super_admin %}
-                        <div class="card border-danger">
-                            <div class="card-header bg-danger text-white">슈퍼 관리자 전용 기능</div>
+                        <div class="card border-danger mt-4">
+                            <div class="card-header bg-danger text-white">[슈퍼 관리자] 전용 기능</div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-md-3">
-                                        <a href="{{ url_for('api.export_stores_excel') }}" class="btn btn-outline-dark w-100">브랜드 계정 백업</a>
+                                    <div class="col-md-4">
+                                        <a href="{{ url_for('api.export_stores_excel') }}" class="btn btn-outline-dark w-100">(4-1) 브랜드 계정 백업</a>
                                     </div>
-                                    <div class="col-md-3">
-                                        <button class="btn btn-outline-dark w-100" disabled>브랜드 계정 복구</button>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-outline-dark w-100" disabled>(4-2) 브랜드 계정 복구 (구현중)</button>
                                     </div>
-                                    <div class="col-md-3">
-                                        <button class="btn btn-outline-dark w-100" disabled>브랜드 계정 삭제</button>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-outline-dark w-100" disabled>(4-3) 브랜드 계정 삭제 (구현중)</button>
                                     </div>
-                                    <div class="col-md-3">
-                                        <form action="{{ url_for('api.reset_store_db') }}" method="POST" onsubmit="return confirm('🚨 모든 시스템 데이터가 초기화됩니다. 정말 진행하시겠습니까?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="btn btn-danger w-100">모든 시스템 초기화</button>
+                                    <div class="col-md-6">
+                                        <button class="btn btn-outline-dark w-100" disabled>(4-4) 브랜드 계정 비활성화 (구현중)</button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <form action="{{ url_for('api.reset_store_db') }}" method="POST" onsubmit="return confirm('🚨 모든 시스템 데이터가 초기화됩니다.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger w-100">(4-5) 모든 시스템 초기화</button>
                                         </form>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         {% endif %}
-
                     </div>
 
                 </div>
             </div>
-
         </div>
-
     </div>
 
     {% if current_user.is_admin and current_user.brand_id and not current_user.store_id %}
-    <div class="modal fade" id="edit-store-modal" tabindex="-1" aria-labelledby="editStoreModalLabel" aria-hidden="true">
+    <div class="modal fade" id="edit-store-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editStoreModalLabel">매장 정보 수정</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title">매장 수정</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="form-edit-store">
-                        <div class="mb-3">
-                            <label for="edit_store_code" class="form-label">매장 코드*</label>
-                            <input type="text" class="form-control" id="edit_store_code" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_store_name" class="form-label">매장 이름*</label>
-                            <input type="text" class="form-control" id="edit_store_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_store_phone" class="form-label">매장 연락처</label>
-                            <input type="tel" class="form-control" id="edit_store_phone">
-                        </div>
-                        <div id="edit-store-status" class="mt-2"></div>
+                        <div class="mb-3"><label>코드</label><input type="text" class="form-control" id="edit_store_code" required></div>
+                        <div class="mb-3"><label>이름</label><input type="text" class="form-control" id="edit_store_name" required></div>
+                        <div class="mb-3"><label>연락처</label><input type="tel" class="form-control" id="edit_store_phone"></div>
+                        <div id="edit-store-status"></div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                    <button type="button" class="btn btn-primary" id="btn-save-edit-store">수정 완료</button>
-                </div>
+                <div class="modal-footer"><button class="btn btn-primary" id="btn-save-edit-store">수정 완료</button></div>
             </div>
         </div>
     </div>
     {% endif %}
     
     {% if current_user.is_admin and current_user.store_id %}
-    <div class="modal fade" id="edit-staff-modal" tabindex="-1" aria-labelledby="editStaffModalLabel" aria-hidden="true">
+    <div class="modal fade" id="edit-staff-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editStaffModalLabel">직원 정보 수정</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title">직원 수정</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="form-edit-staff">
-                        <div class="mb-3">
-                            <label for="edit_staff_name" class="form-label">직원 이름*</label>
-                            <input type="text" class="form-control" id="edit_staff_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_staff_position" class="form-label">직책</label>
-                            <input type="text" class="form-control" id="edit_staff_position">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_staff_contact" class="form-label">연락처</label>
-                            <input type="tel" class="form-control" id="edit_staff_contact">
-                        </div>
-                        <div id="edit-staff-status" class="mt-2"></div>
+                        <div class="mb-3"><label>이름</label><input type="text" class="form-control" id="edit_staff_name" required></div>
+                        <div class="mb-3"><label>직책</label><input type="text" class="form-control" id="edit_staff_position"></div>
+                        <div class="mb-3"><label>연락처</label><input type="tel" class="form-control" id="edit_staff_contact"></div>
+                        <div id="edit-staff-status"></div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                    <button type="button" class="btn btn-primary" id="btn-save-edit-staff">수정 완료</button>
-                </div>
+                <div class="modal-footer"><button class="btn btn-primary" id="btn-save-edit-staff">수정 완료</button></div>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/setting.js') }}" defer></script>
     
     <script>
         window.initialCategoryConfig = {{ category_config | tojson | safe if category_config else 'null' }};
         
-        // 드롭다운 선택 시 히든 인풋 업데이트 (본사 관리자용)
-        function updateHiddenStoreIds(selectId, inputClass) {
+        // 드롭다운 값 변경 시 hidden input 업데이트 (본사 관리자용)
+        function updateHiddenInputs(selectId) {
             const select = document.getElementById(selectId);
             if (!select) return;
             const val = select.value;
-            document.querySelectorAll('.' + inputClass).forEach(input => {
-                input.value = val;
+            document.querySelectorAll('.target-store-id-input').forEach(input => {
+                 input.value = val;
             });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 초기화 및 변경 이벤트 등록
+            // 주문 탭 드롭다운
             const ordersSelect = document.getElementById('orders_target_store');
-            if(ordersSelect) {
-                ordersSelect.addEventListener('change', () => updateHiddenStoreIds('orders_target_store', 'target-store-id-input'));
-                updateHiddenStoreIds('orders_target_store', 'target-store-id-input'); // 초기값
+            if (ordersSelect) {
+                ordersSelect.addEventListener('change', () => updateHiddenInputs('orders_target_store'));
+                updateHiddenInputs('orders_target_store'); // 초기값 반영
             }
-
+            
+            // 재고 탭 드롭다운
             const stockSelect = document.getElementById('stock_target_store');
-            if(stockSelect) {
-                stockSelect.addEventListener('change', () => updateHiddenStoreIds('stock_target_store', 'target-store-id-input'));
-                updateHiddenStoreIds('stock_target_store', 'target-store-id-input'); // 초기값
+            if (stockSelect) {
+                stockSelect.addEventListener('change', () => updateHiddenInputs('stock_target_store'));
+                updateHiddenInputs('stock_target_store'); // 초기값 반영
             }
 
-            // 기존 로직 유지
+            // 설정 파일 로드 로직
             const loadSettingsBtn = document.getElementById('btn-load-settings');
             const loadSettingsStatus = document.getElementById('load-settings-status');
             const loadSettingsUrl = document.body.dataset.apiLoadSettingsUrl;
@@ -736,9 +510,7 @@
 
             if (loadSettingsBtn) {
                 loadSettingsBtn.addEventListener('click', async () => {
-                    if (!confirm('서버에 저장된 브랜드 설정 파일을 로드하여 DB에 적용하시겠습니까?\n(기존 설정이 덮어씌워질 수 있습니다.)')) {
-                        return;
-                    }
+                    if (!confirm('브랜드 설정 파일을 로드하여 DB에 적용하시겠습니까?')) return;
                     loadSettingsBtn.disabled = true;
                     loadSettingsStatus.innerHTML = '<div class="alert alert-info">로딩 중...</div>';
                     try {
@@ -747,7 +519,7 @@
                             headers: { 'X-CSRFToken': csrfToken }
                         });
                         const data = await response.json();
-                        if (!response.ok) throw new Error(data.message || '설정 로드 실패');
+                        if (!response.ok) throw new Error(data.message || '실패');
                         loadSettingsStatus.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
                         setTimeout(() => window.location.reload(), 1000);
                     } catch (error) {
@@ -760,19 +532,22 @@
             }
         });
 
-        function confirmReset(targetName) {
-            return confirm(`🚨 경고: [${targetName}] 데이터가 영구적으로 삭제됩니다.\n이 작업은 되돌릴 수 없습니다. 정말 진행하시겠습니까?`);
-        }
-
         function downloadOrdersExcel() {
-            const storeId = document.getElementById('orders_target_store')?.value || '';
-            // 실제 구현 시 API 경로에 파라미터 추가 필요
+            let storeId = '';
+            const select = document.getElementById('orders_target_store');
+            if (select) {
+                 storeId = select.value;
+            }
+            // 매장 관리자용: 본인 ID (필요시 hidden input 등 활용 가능하나 서버에서 세션으로 처리됨)
             window.location.href = "{{ url_for('api.export_orders_excel') }}?target_store_id=" + storeId;
         }
         
         function downloadStockExcel() {
-            const storeId = document.getElementById('stock_target_store')?.value || '';
-             // 실제 구현 시 API 경로에 파라미터 추가 필요 (임시 경로)
+            let storeId = '';
+            const select = document.getElementById('stock_target_store');
+            if (select) {
+                 storeId = select.value;
+            }
             window.location.href = "{{ url_for('api.export_stock_check') }}?target_store_id=" + storeId;
         }
     </script>
