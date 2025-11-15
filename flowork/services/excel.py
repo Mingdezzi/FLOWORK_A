@@ -108,11 +108,16 @@ def _optimize_dataframe(df, brand_settings, upload_mode):
     df['product_number_cleaned'] = df['product_number'].apply(clean_string_upper)
     df['barcode_cleaned'] = df['barcode'].apply(clean_string_upper)
     
+    # [수정] color_cleaned, size_cleaned 생성 로직 추가 (KeyError 방지)
+    if 'color' in df.columns:
+        df['color_cleaned'] = df['color'].apply(clean_string_upper)
+    if 'size' in df.columns:
+        df['size_cleaned'] = df['size'].apply(clean_string_upper)
+    
     if 'product_name' in df.columns:
         df['product_name_cleaned'] = df['product_name'].apply(clean_string_upper)
         df['product_name_choseong'] = df['product_name'].apply(get_choseong)
     
-    # [수정] is_favorite 컬럼 처리 (없으면 생성, 있으면 정수 변환)
     if 'is_favorite' not in df.columns:
         df['is_favorite'] = 0
     else:
@@ -187,7 +192,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         
         column_map_indices = _get_column_indices_from_form(form, field_map, strict=False)
 
-        # [수정] file 객체를 그대로 사용
         df = pd.DataFrame()
         if import_strategy == 'horizontal_matrix':
             if transform_horizontal_to_vertical is None:
@@ -216,7 +220,7 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         db.session.query(Product).filter_by(brand_id=brand_id).delete(synchronize_session=False)
         db.session.commit()
 
-        # ID 맵핑용 딕셔너리 (세션 만료 방지를 위해 ID만 저장)
+        # ID 맵핑용 딕셔너리
         products_id_map = {} 
         
         total_products = 0
@@ -242,7 +246,7 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
                         product_name=item['product_name'],
                         release_year=item['release_year'] if item['release_year'] > 0 else None,
                         item_category=item['item_category'],
-                        is_favorite=item['is_favorite'], # 이제 키 에러 안 남
+                        is_favorite=item['is_favorite'],
                         product_number_cleaned=pn,
                         product_name_cleaned=item['product_name_cleaned'],
                         product_name_choseong=item['product_name_choseong']
@@ -262,6 +266,7 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
             for item in batch:
                 pid = products_id_map.get(item['product_number_cleaned'])
                 if pid:
+                    # [수정] item 딕셔너리에 color_cleaned, size_cleaned가 존재함을 보장받음
                     v = Variant(
                         product_id=pid,
                         barcode=item['barcode'],
@@ -271,8 +276,8 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
                         sale_price=item['sale_price'],
                         hq_quantity=item.get('hq_stock', 0), 
                         barcode_cleaned=item['barcode_cleaned'],
-                        color_cleaned=item['color_cleaned'],
-                        size_cleaned=item['size_cleaned']
+                        color_cleaned=item.get('color_cleaned', clean_string_upper(item['color'])),
+                        size_cleaned=item.get('size_cleaned', clean_string_upper(item['size']))
                     )
                     variants_to_add.append(v)
             
@@ -322,7 +327,6 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
             
         column_map_indices = _get_column_indices_from_form(form, field_map, strict=False)
 
-        # [수정] 경로로 파일 열기
         with open(file_path, 'rb') as f:
             df = pd.DataFrame()
             if import_strategy == 'horizontal_matrix' and transform_horizontal_to_vertical:
@@ -378,13 +382,18 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                 if not prod:
                     if not allow_create: continue
                     pname = item.get('product_name') or item['product_number']
+                    
+                    # [수정] item의 cleaned 값 사용 또는 직접 계산 (빈 문자열 방지)
+                    pn_cleaned_val = item.get('product_name_cleaned') or clean_string_upper(pname)
+                    choseong_val = item.get('product_name_choseong') or get_choseong(pname)
+
                     prod = Product(
                         brand_id=brand_id, 
                         product_number=item['product_number'], 
                         product_name=pname, 
                         product_number_cleaned=pn_clean, 
-                        product_name_cleaned=item.get('product_name_cleaned', clean_string_upper(pname)), 
-                        product_name_choseong=item.get('product_name_choseong', get_choseong(pname))
+                        product_name_cleaned=pn_cleaned_val, 
+                        product_name_choseong=choseong_val
                     )
                     product_map[pn_clean] = prod
                     new_prods.append(prod)
@@ -412,8 +421,9 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                         sale_price=sp, 
                         hq_quantity=0, 
                         barcode_cleaned=bc_clean,
-                        color_cleaned=clean_string_upper(item['color']),
-                        size_cleaned=clean_string_upper(item['size'])
+                        # [수정] cleaned 필드 할당 보완
+                        color_cleaned=item.get('color_cleaned') or clean_string_upper(item['color']),
+                        size_cleaned=item.get('size_cleaned') or clean_string_upper(item['size'])
                     )
                     variant_map[bc_clean] = var
                     new_vars.append(var)
