@@ -1,7 +1,9 @@
 import pandas as pd
 import io
+from flowork.services.brand_logic import get_brand_logic
 
 def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_mapping_config, column_map_indices):
+    # 1. 파일 읽기
     file_stream.seek(0)
     try:
         df_stock = pd.read_excel(file_stream)
@@ -15,8 +17,8 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
 
     df_stock.columns = df_stock.columns.astype(str).str.strip()
 
+    # 2. 필요한 컬럼 추출 (메타데이터)
     extracted_data = pd.DataFrame()
-    
     field_to_col_idx = {
         'product_number': column_map_indices.get('product_number'),
         'product_name': column_map_indices.get('product_name'),
@@ -28,90 +30,36 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
     }
 
     total_cols = len(df_stock.columns)
-
     for field, idx in field_to_col_idx.items():
         if idx is not None and 0 <= idx < total_cols:
             extracted_data[field] = df_stock.iloc[:, idx]
         else:
             extracted_data[field] = None
 
+    # 3. 사이즈 컬럼(0~29) 식별
     size_cols = [col for col in df_stock.columns if col in [str(i) for i in range(30)]]
     if not size_cols:
         return [] 
 
     df_merged = pd.concat([extracted_data, df_stock[size_cols]], axis=1)
 
-    # 1. 사이즈 매핑용 키 (변환 로직용)
-    def get_size_mapping_key(row):
-        pn = str(row.get('product_number', '')).strip().upper()
-        if not pn: return '기타'
+    # -------------------------------------------------------------------------
+    # [핵심] 브랜드별 로직 주입 (Strategy Pattern)
+    # -------------------------------------------------------------------------
+    
+    # JSON 설정에서 'LOGIC' 필드를 읽어옴 (없으면 'GENERIC')
+    logic_name = category_mapping_config.get('LOGIC', 'GENERIC')
+    
+    # 해당 로직 모듈 가져오기 (예: eider.py)
+    logic_module = get_brand_logic(logic_name)
 
-        first = pn[0] if len(pn) > 0 else ''
-        gender = pn[1] if len(pn) > 1 else ''
-        code = pn[5] if len(pn) > 5 else ''
+    # 로직 적용
+    df_merged['Mapping_Key'] = df_merged.apply(logic_module.get_size_mapping_key, axis=1)
+    df_merged['DB_Category'] = df_merged.apply(lambda r: logic_module.get_db_item_category(r, category_mapping_config), axis=1)
 
-        # [로직 1] 첫 글자가 J면 키즈
-        if first == "J":
-            return "키즈"
-        
-        if code in ["1", "2", "4", "5", "6", "M", "7"]:
-            return "상의"
-        
-        if code in ["G", "N"]:
-            return "신발"
-        
-        if code == "C":
-            return "모자"
-        
-        if code == "S":
-            return "양말"
-        
-        if code in ["B", "T"]:
-            return "가방스틱"
-        
-        if code == "V":
-            return "장갑"
-        
-        if code in ["A", "8", "9"]:
-            return "기타"
-        
-        if code == "3":
-            if gender == "M": return "남성하의"
-            if gender == "W": return "여성하의"
-            if gender == "U": return "남성하의"
-            return "남성하의"
+    # -------------------------------------------------------------------------
 
-        category_val = str(row.get('item_category', '')).strip()
-        if category_val and category_val != 'nan' and category_val != 'None':
-             return category_val
-             
-        return "기타"
-
-    # 2. DB 저장용 카테고리 명 (수정됨)
-    def get_db_item_category(row):
-        product_code = str(row.get('product_number', '')).strip().upper()
-        
-        # [수정] 품번이 'J'로 시작하면 무조건 '키즈'로 분류 (가장 우선)
-        if product_code.startswith("J"):
-             return "키즈"
-
-        # 그 외는 JSON 설정 규칙 따름
-        if category_mapping_config:
-            target_index = category_mapping_config.get('INDEX', 5)
-            mapping_map = category_mapping_config.get('MAP', {})
-            default_value = category_mapping_config.get('DEFAULT', '기타')
-
-            if len(product_code) <= target_index: return default_value
-            code_char = product_code[target_index]
-            return mapping_map.get(code_char, default_value)
-        
-        # 설정도 없으면 엑셀 값 사용
-        mapped_val = row.get('item_category')
-        return str(mapped_val).strip() if mapped_val else '기타'
-
-    df_merged['Mapping_Key'] = df_merged.apply(get_size_mapping_key, axis=1)
-    df_merged['DB_Category'] = df_merged.apply(get_db_item_category, axis=1)
-
+    # 5. 데이터 변환 (Unpivot/Melt)
     id_vars = ['product_number', 'product_name', 'color', 'original_price', 'sale_price', 'release_year', 'DB_Category', 'Mapping_Key']
     
     df_melted = df_merged.melt(
@@ -123,6 +71,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
 
     df_melted['Quantity'] = pd.to_numeric(df_melted['Quantity'], errors='coerce').fillna(0).astype(int)
     
+    # 6. 사이즈 코드 매핑
     def get_real_size(row):
         mapping_key = row['Mapping_Key']
         size_code = str(row['Size_Code'])
@@ -139,11 +88,12 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
 
     df_melted['Real_Size'] = df_melted.apply(get_real_size, axis=1)
     
+    # 매핑되지 않은 사이즈 제거
     df_final = df_melted[df_melted['Real_Size'] != "Unknown"]
 
+    # 7. 최종 결과 리스트 생성
     result_list = []
     for _, row in df_final.iterrows():
-        
         try: op = int(float(row.get('original_price', 0) or 0))
         except: op = 0
         try: sp = int(float(row.get('sale_price', 0) or 0))

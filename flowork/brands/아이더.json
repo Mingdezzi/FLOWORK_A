@@ -2,6 +2,7 @@
   "BARCODE_FORMAT": "{product_number}{color}{size}",
   "IMPORT_STRATEGY": "horizontal_matrix",
   "CATEGORY_MAPPING_RULE": {
+    "LOGIC": "EIDER", 
     "INDEX": 5,
     "DEFAULT": "기타",
     "MAP": {
