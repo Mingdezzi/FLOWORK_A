@@ -274,6 +274,16 @@ def live_search():
     page = data.get('page', 1)
     per_page = data.get('per_page', 10)
     
+    try:
+        setting_prefix = Setting.query.filter_by(brand_id=current_user.current_brand_id, key='IMAGE_URL_PREFIX').first()
+        setting_rule = Setting.query.filter_by(brand_id=current_user.current_brand_id, key='IMAGE_NAMING_RULE').first()
+        
+        img_prefix = setting_prefix.value if setting_prefix else "https://files.ebizway.co.kr/files/10249/Style/"
+        img_rule = setting_rule.value if setting_rule else "{product_number}.jpg"
+    except:
+        img_prefix = "https://files.ebizway.co.kr/files/10249/Style/"
+        img_rule = "{product_number}.jpg"
+    
     base_query = Product.query.options(selectinload(Product.variants)).filter(
         Product.brand_id == current_user.current_brand_id
     )
@@ -306,29 +316,49 @@ def live_search():
 
     results_list = []
     for product in products:
-        image_pn = product.product_number.split(' ')[0]
+        pn = product.product_number.split(' ')[0]
+        year = str(product.release_year) if product.release_year else ""
+        if not year and len(pn) >= 5 and pn[3:5].isdigit():
+             year = f"20{pn[3:5]}"
+        
         colors = ""
         sale_price_f = "가격정보없음"
         original_price_f = 0
         discount_f = "-"
         product_variants = product.variants 
+        
+        first_color = "00"
 
         if product_variants:
             colors_list = sorted(list(set(v.color for v in product_variants if v.color)))
             colors = ", ".join(colors_list)
+            
             first_variant = product_variants[0]
+            if first_variant.color: first_color = first_variant.color
+                
             sale_price_f = f"{first_variant.sale_price:,d}원"
             original_price_f = first_variant.original_price
             if original_price_f and original_price_f > 0 and original_price_f != sale_price_f:
                 discount_f = f"{int((1 - (first_variant.sale_price / original_price_f)) * 100)}%"
             else:
                 discount_f = "0%"
+        
+        try:
+            filename = img_rule.format(
+                product_number=pn,
+                color=first_color,
+                year=year
+            )
+        except:
+            filename = f"{pn}.jpg"
+            
+        image_full_url = f"{img_prefix}{filename}"
 
         results_list.append({
             "product_id": product.id,
             "product_number": product.product_number,
             "product_name": product.product_name,
-            "image_pn": image_pn,
+            "image_url": image_full_url,
             "colors": colors,
             "sale_price": sale_price_f,
             "original_price": original_price_f,

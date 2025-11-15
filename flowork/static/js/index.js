@@ -190,7 +190,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const paginationUL = document.getElementById('search-pagination');
     
     const liveSearchUrl = document.body.dataset.liveSearchUrl;
-    const imageURLPrefix = document.body.dataset.imageUrlPrefix;
 
     let debounceTimer;
 
@@ -264,7 +263,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
             const productHtml = `
                 <li class="list-group-item">
                     <a href="/product/${product.product_id}" class="product-item d-flex align-items-center text-decoration-none text-body">
-                        <img src="${imageURLPrefix}${product.image_pn}.jpg" alt="${product.product_name}" class="item-image rounded border flex-shrink-0" onerror="imgFallback(this)">
+                        <img src="${product.image_url}" alt="${product.product_name}" class="item-image rounded border flex-shrink-0" onerror="imgFallback(this)">
                         <div class="item-details flex-grow-1 ms-3">
                             <div class="product-name fw-bold">${product.product_name}</div>
                             <div class="product-meta small text-muted">
