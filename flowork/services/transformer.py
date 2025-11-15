@@ -15,6 +15,7 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             file_stream.seek(0)
             df_stock = pd.read_csv(file_stream, encoding='cp949')
 
+    # [수정] 모든 컬럼명을 문자열로 변환 (0 -> '0')하여 숫자형 헤더 인식 문제 해결
     df_stock.columns = df_stock.columns.astype(str).str.strip()
 
     # 2. 컬럼 추출
@@ -36,10 +37,13 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         else:
             extracted_data[field] = None
 
-    # 3. 사이즈 컬럼 식별
+    # 3. 사이즈 컬럼 식별 (이제 문자열 비교가 정상 작동함)
+    # 0~29까지의 숫자 헤더를 찾음
     size_cols = [col for col in df_stock.columns if col in [str(i) for i in range(30)]]
+    
     if not size_cols:
-        return pd.DataFrame() # 빈 DF 반환
+        # 사이즈 컬럼을 못 찾으면 빈 DF 반환 (이게 문제였음)
+        return pd.DataFrame()
 
     df_merged = pd.concat([extracted_data, df_stock[size_cols]], axis=1)
 
@@ -84,7 +88,8 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
 
     df_final = df_final.dropna(subset=['Real_Size'])
 
-    # 7. 데이터 정제 및 반환 (DataFrame 반환!)
+    # 7. 데이터 정제 및 반환
+    # [주의] 여기서는 항상 'hq_stock'으로 반환하지만, excel.py에서 모드에 따라 store_stock으로 바꿀 것임
     df_final['hq_stock'] = pd.to_numeric(df_final['Quantity'], errors='coerce').fillna(0).astype(int)
     
     df_final['original_price'] = pd.to_numeric(df_final['original_price'], errors='coerce').fillna(0).astype(int)
@@ -115,5 +120,4 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         'item_category', 'release_year', 'is_favorite'
     ]
     
-    # [수정됨] to_dict 제거하고 DataFrame 반환
     return df_final[final_cols]
