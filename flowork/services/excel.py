@@ -515,16 +515,19 @@ def _process_stock_update_excel(file, form, upload_mode, brand_id, target_store_
 
 def export_db_to_excel(brand_id):
     try:
-        products_variants_query = db.session.query(
+        # [최적화] 1. 쿼리 객체 생성 (실행은 나중에 yield_per로 함)
+        query = db.session.query(
             Product.product_number, Product.product_name, Product.release_year, Product.item_category, Product.is_favorite,
             Variant.barcode, Variant.color, Variant.size, Variant.original_price, Variant.sale_price, Variant.hq_quantity,
-        ).join(Variant, Product.id == Variant.product_id).filter(Product.brand_id == brand_id).all()
+        ).join(Variant, Product.id == Variant.product_id).filter(Product.brand_id == brand_id)
         
-        wb = openpyxl.Workbook()
-        ws = wb.active
+        # [최적화] 2. write_only=True 로 메모리 절약 모드 사용
+        wb = openpyxl.Workbook(write_only=True)
+        ws = wb.create_sheet()
         ws.append(["품번", "품명", "연도", "카테고리", "바코드", "컬러", "사이즈", "정상가", "판매가", "본사재고", "즐겨찾기"])
         
-        for row in products_variants_query:
+        # [최적화] 3. yield_per(1000)을 사용하여 데이터를 스트리밍 방식으로 처리 (DB -> App Server)
+        for row in query.yield_per(1000):
             ws.append(list(row))
             
         output = io.BytesIO()
@@ -532,6 +535,8 @@ def export_db_to_excel(brand_id):
         output.seek(0)
         return output, f"db_backup_{datetime.now().strftime('%Y%m%d')}.xlsx", None
     except Exception as e:
+        print(f"Export Error: {e}")
+        traceback.print_exc()
         return None, None, str(e)
 
 def export_stock_check_excel(store_id, brand_id):
