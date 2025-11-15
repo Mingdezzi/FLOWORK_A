@@ -346,56 +346,6 @@ def live_search():
         "has_prev": pagination.has_prev
     })
 
-@api_bp.route('/api/analyze_excel', methods=['POST'])
-@login_required
-def analyze_excel():
-    if 'excel_file' not in request.files:
-        return jsonify({'status': 'error', 'message': '파일이 없습니다.'}), 400
-    
-    file = request.files.get('excel_file')
-    if file.filename == '':
-        return jsonify({'status': 'error', 'message': '파일이 선택되지 않았습니다.'}), 400
-
-    if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-        return jsonify({'status': 'error', 'message': '엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.'}), 400
-
-    try:
-        file_bytes = file.read()
-        import openpyxl
-        from openpyxl.utils import get_column_letter, column_index_from_string
-        
-        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
-        ws = wb.active
-        
-        max_col_index = ws.max_column
-        if max_col_index > 26: max_col_index = 26 
-        column_letters = [get_column_letter(i) for i in range(1, max_col_index + 1)]
-        
-        preview_data = {}
-        max_row_preview = min(6, ws.max_row + 1) 
-        
-        if max_row_preview <= 1:
-             return jsonify({'status': 'error', 'message': '파일에 데이터가 없습니다.'}), 400
-
-        for col_letter in column_letters:
-            col_data = []
-            col_index = column_index_from_string(col_letter)
-            for i in range(1, max_row_preview):
-                cell_val = ws.cell(row=i, column=col_index).value
-                col_data.append(str(cell_val) if cell_val is not None else '')
-            preview_data[col_letter] = col_data
-            
-        return jsonify({
-            'status': 'success',
-            'column_letters': column_letters,
-            'preview_data': preview_data
-        })
-        
-    except Exception as e:
-        print(f"Excel analyze error: {e}")
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': f'엑셀 파일 분석 중 오류 발생: {e}'}), 500
-
 @api_bp.route('/bulk_update_actual_stock', methods=['POST'])
 @login_required
 def bulk_update_actual_stock():
