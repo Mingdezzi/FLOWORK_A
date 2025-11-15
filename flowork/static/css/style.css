@@ -732,8 +732,8 @@ body[data-page-mode="edit"] #btn-enable-edit {
     cursor: not-allowed;
 }
 
-/* (수정) 기존 nav-tabs 숨기기 */
-.nav.nav-tabs {
+/* (수정) 기존 nav-tabs 숨기기 (설정 페이지의 탭은 예외 처리) */
+.nav.nav-tabs:not(.card-header-tabs) {
     display: none;
 }
 
