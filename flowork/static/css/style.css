@@ -1,15 +1,10 @@
-/* --- index.html & Global Layout --- */
-
-/* (1) 스크롤바 흔들림 방지: 스크롤바 트랙을 항상 표시 */
 html { 
     overflow-y: scroll; 
 }
 
-/* (2) 모든 페이지 너비를 1800px로 강제 통일 */
-/* Bootstrap의 반응형 너비(media query)를 무시하고 꽉 차게 설정 */
 .container { 
-    width: 100% !important; /* 반응형 고정 너비 무시하고 꽉 채움 */
-    max-width: 1800px !important; /* 최대 너비 제한 */
+    width: 100% !important;
+    max-width: 1800px !important;
     padding-right: var(--bs-gutter-x, .75rem);
     padding-left: var(--bs-gutter-x, .75rem);
     margin-right: auto;
@@ -35,7 +30,6 @@ html {
 .nav-tabs { border-bottom: 1px solid #dee2e6; }
 .nav-link { color: #6c757d; }
 
-/* 카테고리 버튼바 스타일 (Grid 적용) */
 #category-bar {
     display: grid !important;
     gap: 5px;
@@ -145,8 +139,6 @@ html {
     font-weight: 500;
 }
 
-
-/* --- list.html --- */
 .advanced-search-form .form-label { 
     font-size: 0.85rem; 
     margin-bottom: 0.2rem; 
@@ -157,8 +149,6 @@ html {
     font-size: 0.875rem;
 }
 
-
-/* --- detail.html --- */
 .nav-item.disabled > .nav-link { color: #adb5bd !important; background-color: transparent !important; }
 
 .product-details {
@@ -206,7 +196,6 @@ html {
      flex: 1 1 100%;
      width: 160px;
 }
-
 
 .btn-toggle-actual-stock.active { background-color: #28a745; border-color: #28a745; }
 
@@ -321,12 +310,10 @@ body.edit-mode #add-variant-row { display: table-row; }
      width: 200px;
 }
 
-
 .stock-quantity, .stock-hq {
     font-size: 2rem; 
     font-weight: bold;
 }
-
 
 @media (max-width: 768px) { 
     .stock-table {
@@ -366,7 +353,6 @@ body.edit-mode #add-variant-row { display: table-row; }
     }
 }
 
-/* --- stock.html --- */
 .card-header h3 { font-size: 1.15rem; font-weight: 500;}
 .management-form button { flex-shrink: 0; }
 .reset-button { background-color: #ffc107; color: #333; border: none;}
@@ -511,7 +497,6 @@ body.edit-mode #add-variant-row { display: table-row; }
     color: #dc3545;
 }
 
-/* --- order.html --- */
 .order-list-item-stacked {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid rgba(0, 0, 0, 0.125);
@@ -574,7 +559,6 @@ body.edit-mode #add-variant-row { display: table-row; }
     }
 }
 
-/* --- Order Status Grid --- */
 .order-status-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr); 
@@ -608,8 +592,6 @@ body.edit-mode #add-variant-row { display: table-row; }
 .status-btn.status-5.active { background-color: var(--bs-success); } 
 .status-btn.status-6.active { background-color: var(--bs-secondary); } 
 
-
-/* --- order_detail.html Modes --- */
 body[data-page-mode="view"] .editable-on-demand:disabled,
 body[data-page-mode="view"] .editable-on-demand[readonly] {
     background-color: transparent;
@@ -658,7 +640,6 @@ body[data-page-mode="edit"] #btn-enable-edit {
     display: none; 
 }
 
-/* --- Navigation Grid --- */
 .nav-grid-container {
     display: grid;
     grid-template-columns: repeat(4, 1fr); 
@@ -669,14 +650,12 @@ body[data-page-mode="edit"] #btn-enable-edit {
     background-color: #f8f9fa;
 }
 
-/* 화면이 넓으면 한 줄로 8개 배치 */
 @media (min-width: 992px) {
     .nav-grid-container {
         grid-template-columns: repeat(8, 1fr);
     }
 }
 
-/* 네비게이션 버튼 스타일 (기준) */
 .nav-grid-item {
     display: flex;
     flex-direction: column;
@@ -689,7 +668,7 @@ body[data-page-mode="edit"] #btn-enable-edit {
     border: 1px solid #dee2e6;
     border-radius: 0.25rem;
     text-decoration: none;
-    height: 60px; /* 높이 고정 */
+    height: 60px;
     text-align: center;
     line-height: 1.3;
 }
@@ -732,13 +711,10 @@ body[data-page-mode="edit"] #btn-enable-edit {
     cursor: not-allowed;
 }
 
-/* (수정) 기존 nav-tabs 숨기기 (설정 페이지의 탭은 예외 처리) */
 .nav.nav-tabs:not(.card-header-tabs) {
     display: none;
 }
 
-
-/* --- Main Header Layout --- */
 .main-header {
     margin-bottom: 1rem !important;
     padding: 0 0.5rem;
@@ -758,7 +734,6 @@ body[data-page-mode="edit"] #btn-enable-edit {
     white-space: nowrap;
 }
 
-/* 헤더 버튼용 공통 스타일 - 네비게이션 버튼과 동일하게 맞춤 */
 .header-btn-uniform {
     display: flex;
     flex-direction: column;
@@ -773,7 +748,7 @@ body[data-page-mode="edit"] #btn-enable-edit {
     text-decoration: none;
     height: 60px;
     width: 100%;
-    max-width: 80px; /* 너무 넓어지지 않게 제한 */
+    max-width: 80px; 
     min-width: 60px;
     text-align: center;
     line-height: 1.3;
@@ -787,8 +762,6 @@ body[data-page-mode="edit"] #btn-enable-edit {
     margin-bottom: 2px;
 }
 
-
-/* --- Announcements --- */
 .announcement-list-item:hover {
     background-color: #f8f9fa;
 }
@@ -800,7 +773,6 @@ body[data-page-mode="edit"] #btn-enable-edit {
     text-overflow: ellipsis;
 }
 
-/* --- Settings --- */
 .section-title-sub {
     font-size: 1.1rem;
     font-weight: 500;
@@ -815,11 +787,9 @@ body[data-page-mode="edit"] #btn-enable-edit {
     vertical-align: middle;
 }
 
-/* --- (3) Search & Detail Page Styles (New) --- */
-/* PC 화면에서 카드 높이를 화면에 맞게 고정하고 내부 스크롤 적용 */
 @media (min-width: 992px) {
     .full-height-card {
-        height: calc(100vh - 140px); /* 헤더, 네비게이션, 여백 고려 */
+        height: calc(100vh - 140px); 
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -829,17 +799,120 @@ body[data-page-mode="edit"] #btn-enable-edit {
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        padding: 0; /* 내부 패딩 제거하여 리스트/iframe 꽉 채움 */
+        padding: 0; 
     }
     .full-height-card .product-list-scrollable {
         flex: 1;
         overflow-y: auto;
     }
-    /* Iframe Container */
+    
     .detail-iframe-container {
         flex: 1;
         width: 100%;
         height: 100%;
         border: none;
     }
+}
+
+.nav-container {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.nav-category-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    border-collapse: collapse;
+}
+.nav-group {
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+.nav-group:last-child {
+    border-right: none;
+}
+.btn-nav-category {
+    width: 100%;
+    padding: 12px 4px;
+    background-color: #f8f9fa;
+    border: none;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9rem;
+    text-align: center;
+    border-radius: 0;
+}
+.btn-nav-category:hover {
+    background-color: #e9ecef;
+}
+.nav-sub-items {
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+    flex-grow: 1;
+}
+.btn-nav-item {
+    width: 100%;
+    padding: 10px 5px;
+    font-size: 0.8rem;
+    color: #555;
+    border: none;
+    border-bottom: 1px solid #f1f1f1;
+    border-radius: 0;
+    text-align: center;
+    transition: all 0.2s;
+}
+.btn-nav-item:last-child {
+    border-bottom: none;
+}
+.btn-nav-item:hover:not(.disabled) {
+    background-color: #fff3f2;
+    color: #eb6864;
+    font-weight: bold;
+}
+.btn-nav-item.active {
+    background-color: #eb6864;
+    color: white;
+    font-weight: bold;
+}
+.btn-nav-item.disabled {
+    color: #adb5bd;
+    background-color: #fcfcfc;
+    cursor: default;
+}
+.empty-slot {
+    flex-grow: 1;
+    min-height: 40px;
+}
+@media (max-width: 991px) {
+    .nav-category-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    .nav-group {
+        border-bottom: 1px solid #dee2e6;
+    }
+}
+@media (max-width: 576px) {
+    .nav-category-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (min-width: 992px) {
+    .nav-sub-items.collapse {
+        display: flex;
+        height: auto !important;
+        visibility: visible;
+    }
+    .btn-nav-category {
+        pointer-events: none; 
+    }
+}
+.header-left .bi {
+    color: #eb6864;
+}
+.hover-text-danger:hover {
+    color: #dc3545 !important;
 }
