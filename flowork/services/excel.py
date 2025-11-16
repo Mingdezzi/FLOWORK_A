@@ -127,14 +127,8 @@ def _optimize_dataframe(df, brand_settings, upload_mode):
     return df
 
 def verify_stock_excel(file_path, form, upload_mode):
-    field_map = {}
-    if upload_mode == 'db':
-        field_map = {'product_number': ('col_pn', True)}
-    elif upload_mode == 'hq':
-        field_map = {'product_number': ('col_pn', True), 'hq_stock': ('col_hq_stock', True)}
-    else:
-        field_map = {'product_number': ('col_pn', True), 'store_stock': ('col_store_stock', True)}
-
+    field_map = {'product_number': ('col_pn', True)}
+    
     try:
         column_map_indices = _get_column_indices_from_form(form, field_map, strict=False)
         
@@ -165,36 +159,35 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
     if not file: return False, '파일이 없습니다.', 'error'
     BATCH_SIZE = 1000
     
+    is_horizontal = form.get('is_horizontal') == 'on'
+    
     try:
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
         
-        import_strategy = brand_settings.get('IMPORT_STRATEGY')
-        has_size_column = bool(form.get('col_size'))
-        
-        if has_size_column:
-            import_strategy = None 
-            
         field_map = {
             'product_number': ('col_pn', True),
-            'product_name': ('col_pname', True),
             'color': ('col_color', True),
-            'size': ('col_size', True if has_size_column else False),
+            'product_name': ('col_pname', False),
             'release_year': ('col_year', False),
             'item_category': ('col_category', False),
             'original_price': ('col_oprice', False),
             'sale_price': ('col_sprice', False),
-            'is_favorite': ('col_favorite', False),
-            'barcode': ('col_barcode', False)
+            'is_favorite': ('col_favorite', False)
         }
-        
+
+        if is_horizontal:
+            import_strategy = 'horizontal_matrix'
+        else:
+            import_strategy = None
+            field_map['size'] = ('col_size', True)
+            
         column_map_indices = _get_column_indices_from_form(form, field_map, strict=False)
 
         df = pd.DataFrame()
         if import_strategy == 'horizontal_matrix':
             if transform_horizontal_to_vertical is None:
                 return False, 'pandas 라이브러리가 필요합니다.', 'error'
-            
             try:
                 size_mapping_config = json.loads(brand_settings.get('SIZE_MAPPING', '{}'))
                 category_mapping_config = json.loads(brand_settings.get('CATEGORY_MAPPING_RULE', '{}'))
@@ -218,7 +211,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         db.session.commit()
 
         products_id_map = {} 
-        
         total_products = 0
         total_variants = 0
         
@@ -237,7 +229,6 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
                 if pn not in products_id_map and pn not in new_products_in_batch:
                     
                     pname = item.get('product_name') or item['product_number']
-                    
                     pn_cleaned_val = item.get('product_name_cleaned') or clean_string_upper(pname)
                     choseong_val = item.get('product_name_choseong') or get_choseong(pname)
                     
@@ -299,30 +290,35 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
         settings_query = Setting.query.filter_by(brand_id=brand_id).all()
         brand_settings = {s.key: s.value for s in settings_query}
         
-        import_strategy = brand_settings.get('IMPORT_STRATEGY')
-        has_size_column = bool(form.get('col_size'))
-        
-        if has_size_column:
-            import_strategy = None
+        is_horizontal = form.get('is_horizontal') == 'on'
 
         field_map = {
             'product_number': ('col_pn', True),
-            'product_name': ('col_pname', False),
             'color': ('col_color', True),
-            'size': ('col_size', True if has_size_column else False),
-            'original_price': ('col_oprice', False),
-            'sale_price': ('col_sprice', False),
-            'barcode': ('col_barcode', False),
+            'product_name': ('col_pname', False),
             'release_year': ('col_year', False),
             'item_category': ('col_category', False),
+            'original_price': ('col_oprice', False),
+            'sale_price': ('col_sprice', False),
             'is_favorite': ('col_favorite', False)
         }
         
+        import_strategy = None
+
         if upload_mode == 'hq':
-            field_map['hq_stock'] = ('col_hq_stock', True)
+            if is_horizontal:
+                import_strategy = 'horizontal_matrix'
+            else:
+                field_map['size'] = ('col_size', True)
+                field_map['hq_stock'] = ('col_hq_stock', True)
+
         elif upload_mode == 'store':
             if not target_store_id: return 0, 0, '매장 ID 누락', 'error'
-            field_map['store_stock'] = ('col_store_stock', True)
+            if is_horizontal:
+                import_strategy = 'horizontal_matrix'
+            else:
+                field_map['size'] = ('col_size', True)
+                field_map['store_stock'] = ('col_store_stock', True)
             
         column_map_indices = _get_column_indices_from_form(form, field_map, strict=False)
 
@@ -334,8 +330,6 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                     cat_conf = json.loads(brand_settings.get('CATEGORY_MAPPING_RULE', '{}'))
                     df = transform_horizontal_to_vertical(f, size_conf, cat_conf, column_map_indices)
                     
-                    # [수정] 매트릭스 변환 후엔 항상 hq_stock이 나오므로, 
-                    # store 모드인 경우 컬럼명을 store_stock으로 변경
                     if upload_mode == 'store' and 'hq_stock' in df.columns:
                         df.rename(columns={'hq_stock': 'store_stock'}, inplace=True)
                         
@@ -357,7 +351,6 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
 
         pn_list = df['product_number_cleaned'].unique().tolist()
         
-        # [성능 개선] products_in_db 조회 시 selectinload에 stock_levels도 체이닝하여 N+1 문제 해결
         products_in_db = Product.query.filter(
             Product.brand_id == brand_id, 
             Product.product_number_cleaned.in_(pn_list)
@@ -406,7 +399,7 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                         product_name_cleaned=pn_cleaned_val, 
                         product_name_choseong=choseong_val
                     )
-                    db.session.add(prod) # [수정] 즉시 세션 추가
+                    db.session.add(prod)
                     product_map[pn_clean] = prod
                     cnt_prod += 1
                 
@@ -435,7 +428,7 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                         color_cleaned=item.get('color_cleaned', clean_string_upper(item['color'])),
                         size_cleaned=item.get('size_cleaned', clean_string_upper(item['size']))
                     )
-                    db.session.add(var) # [수정] 즉시 세션 추가
+                    db.session.add(var)
                     variant_map[bc_clean] = var
                     cnt_var += 1
                 else:
@@ -449,7 +442,6 @@ def process_stock_upsert_excel(file_path, form, upload_mode, brand_id, target_st
                 elif upload_mode == 'store' and 'store_stock' in item:
                     qty = item['store_stock']
                     
-                    # [수정] 매장 재고 업데이트 로직
                     if var.id and var.id in store_stock_map:
                         store_stock_map[var.id].quantity = qty
                         cnt_update += 1
@@ -539,18 +531,16 @@ def _process_stock_update_excel(file, form, upload_mode, brand_id, target_store_
 
 def export_db_to_excel(brand_id):
     try:
-        # [최적화] 1. 쿼리 객체 생성 (실행은 나중에 yield_per로 함)
         query = db.session.query(
-            Product.product_number, Product.product_name, Product.release_year, Product.item_category, Product.is_favorite,
+            Product.product_number, Product.product_name, Product.release_year, Product.item_category,
             Variant.barcode, Variant.color, Variant.size, Variant.original_price, Variant.sale_price, Variant.hq_quantity,
+            Product.is_favorite
         ).join(Variant, Product.id == Variant.product_id).filter(Product.brand_id == brand_id)
         
-        # [최적화] 2. write_only=True 로 메모리 절약 모드 사용
         wb = openpyxl.Workbook(write_only=True)
         ws = wb.create_sheet()
         ws.append(["품번", "품명", "연도", "카테고리", "바코드", "컬러", "사이즈", "정상가", "판매가", "본사재고", "즐겨찾기"])
         
-        # [최적화] 3. yield_per(1000)을 사용하여 데이터를 스트리밍 방식으로 처리 (DB -> App Server)
         for row in query.yield_per(1000):
             ws.append(list(row))
             

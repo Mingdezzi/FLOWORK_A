@@ -58,6 +58,12 @@
                         <input type="hidden" name="upload_mode" value="db"/>
                         <input type="hidden" name="is_full_import" value="true"/>
 
+                        <div class="form-check form-switch mb-3 p-3 bg-light border rounded">
+                            <input class="form-check-input horizontal-mode-switch" type="checkbox" role="switch" id="switch-import-db" name="is_horizontal">
+                            <label class="form-check-label fw-bold" for="switch-import-db">가로형(Matrix) 엑셀 파일인가요?</label>
+                            <div class="form-text">체크 시 '사이즈'가 헤더(가로)에 나열된 형식으로 인식하며, 체크 해제 시 '사이즈' 열을 직접 선택해야 합니다.</div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="db_excel_file" class="form-label file-upload-wrapper" id="wrapper-db-file">
                                 <i class="bi bi-file-earmark-excel-fill fs-4"></i>
@@ -69,61 +75,53 @@
 
                         <div class="column-mapping-grid mb-3" id="grid-import-db">
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_pn_db">품번*</label>
-                                <select id="col_pn_db" name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_pn_db"></div>
-                            </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_pname_db">품명*</label>
-                                <select id="col_pname_db" name="col_pname" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_pname_db"></div>
-                            </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_year_db">출시년도</label>
-                                <select id="col_year_db" name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_year_db"></div>
-                            </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_category_db">품목</label>
-                                <select id="col_category_db" name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_category_db"></div>
-                            </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_color_db">컬러*</label>
-                                <select id="col_color_db" name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_color_db"></div>
+                                <label class="text-danger fw-bold">품번*</label>
+                                <select name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_size_db">사이즈 (자동)</label>
-                                <select id="col_size_db" name="col_size" class="form-select form-select-sm" disabled>
-                                    <option value="">-- 자동 인식 --</option>
-                                </select>
-                                <div class="col-preview" id="preview_col_size_db"></div>
+                                <label class="text-danger fw-bold">컬러*</label>
+                                <select name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
+                            </div></div>
+
+                            <div class="mapping-item-wrapper conditional-field" data-show-if="vertical"><div class="mapping-item">
+                                <label class="text-danger fw-bold">사이즈*</label>
+                                <select name="col_size" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
+                            </div></div>
+
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label>품명</label>
+                                <select name="col_pname" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label>출시년도</label>
+                                <select name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
+                            </div></div>
+                            <div class="mapping-item-wrapper"><div class="mapping-item">
+                                <label>품목</label>
+                                <select name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_oprice_db">최초가</label>
-                                <select id="col_oprice_db" name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_oprice_db"></div>
+                                <label>최초가</label>
+                                <select name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_sprice_db">판매가</label>
-                                <select id="col_sprice_db" name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_sprice_db"></div>
+                                <label>판매가</label>
+                                <select name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_favorite_db">즐겨찾기</label>
-                                <select id="col_favorite_db" name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_favorite_db"></div>
-                            </div></div>
-                            
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_hq_stock_db">본사재고 (자동)</label>
-                                <select id="col_hq_stock_db" name="col_hq_stock" class="form-select form-select-sm" disabled>
-                                    <option value="">-- 자동 인식 --</option>
-                                </select>
-                                <div class="col-preview" id="preview_col_hq_stock_db"></div>
+                                <label>즐겨찾기</label>
+                                <select name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                         </div>
 
@@ -170,6 +168,11 @@
                         </div>
                         {% endif %}
 
+                        <div class="form-check form-switch mb-3 p-3 bg-light border rounded">
+                            <input class="form-check-input horizontal-mode-switch" type="checkbox" role="switch" id="switch-update-store" name="is_horizontal">
+                            <label class="form-check-label fw-bold" for="switch-update-store">가로형(Matrix) 엑셀 파일인가요?</label>
+                        </div>
+
                         <div class="mb-3">
                             <label for="store_stock_excel_file" class="form-label file-upload-wrapper" id="wrapper-store-file">
                                 <i class="bi bi-file-earmark-excel-fill fs-4"></i>
@@ -182,68 +185,74 @@
                         <div class="column-mapping-grid mb-3" id="grid-update-store" style="grid-template-columns: 1fr 1fr 1fr;">
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_pn_store">품번*</label>
-                                    <select id="col_pn_store" name="col_pn" class="form-select form-select-sm" required disabled>
-                                        <option value="">-- 열 선택 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_pn_store"></div>
+                                    <label class="text-danger fw-bold">품번*</label>
+                                    <select name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_pname_store">품명*</label>
-                                    <select id="col_pname_store" name="col_pname" class="form-select form-select-sm" required disabled>
-                                        <option value="">-- 열 선택 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_pname_store"></div>
-                                </div>
-                            </div>
-                            <div class="mapping-item-wrapper">
-                                <div class="mapping-item">
-                                    <label for="col_color_store">컬러*</label>
-                                    <select id="col_color_store" name="col_color" class="form-select form-select-sm" required disabled>
-                                        <option value="">-- 열 선택 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_color_store"></div>
+                                    <label class="text-danger fw-bold">컬러*</label>
+                                    <select name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
                             
-                            <div class="mapping-item-wrapper">
+                            <div class="mapping-item-wrapper conditional-field" data-show-if="vertical">
                                 <div class="mapping-item">
-                                    <label for="col_size_store">사이즈 (자동)</label>
-                                    <select id="col_size_store" name="col_size" class="form-select form-select-sm" disabled>
-                                        <option value="">-- 자동 인식 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_size_store"></div>
+                                    <label class="text-danger fw-bold">사이즈*</label>
+                                    <select name="col_size" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper conditional-field" data-show-if="vertical">
+                                <div class="mapping-item">
+                                    <label class="text-danger fw-bold">매장재고*</label>
+                                    <select name="col_store_stock" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
 
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_oprice_store">최초가*</label>
-                                    <select id="col_oprice_store" name="col_oprice" class="form-select form-select-sm" required disabled>
-                                        <option value="">-- 열 선택 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_oprice_store"></div>
+                                    <label>품명</label>
+                                    <select name="col_pname" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_sprice_store">판매가*</label>
-                                    <select id="col_sprice_store" name="col_sprice" class="form-select form-select-sm" required disabled>
-                                        <option value="">-- 열 선택 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_sprice_store"></div>
+                                    <label>출시년도</label>
+                                    <select name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
-
                             <div class="mapping-item-wrapper">
                                 <div class="mapping-item">
-                                    <label for="col_stock_store">매장재고 (자동)</label>
-                                    <select id="col_stock_store" name="col_store_stock" class="form-select form-select-sm" disabled>
-                                        <option value="">-- 자동 인식 --</option>
-                                    </select>
-                                    <div class="col-preview" id="preview_col_stock_store"></div>
+                                    <label>품목</label>
+                                    <select name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label>최초가</label>
+                                    <select name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label>판매가</label>
+                                    <select name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
+                                </div>
+                            </div>
+                            <div class="mapping-item-wrapper">
+                                <div class="mapping-item">
+                                    <label>즐겨찾기</label>
+                                    <select name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                    <div class="col-preview"></div>
                                 </div>
                             </div>
                         </div>
@@ -268,13 +277,18 @@
                 <div class="card-body">
                     <div class="card-description">
                         <strong>(STOCK_HQ) 엑셀 파일로 '본사 재고' 및 '상품 정보'를 (추가/수정)합니다.</strong>
-                        <span>(품번/컬러/사이즈/본사재고 필수)</span>
+                        <span>(1) '파일 선택' -> (2) 열 분석 -> (3) 열 매핑 -> (4) '본사재고 업로드' 클릭</span>
                     </div>
                     
                     <form id="form-update-hq-full" class="update-stock-form" action="{{ url_for('api.inventory_upsert') }}" method="POST" enctype="multipart/form-data" onsubmit="return confirm('엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="upload_mode" value="hq"/>
                         
+                        <div class="form-check form-switch mb-3 p-3 bg-light border rounded">
+                            <input class="form-check-input horizontal-mode-switch" type="checkbox" role="switch" id="switch-update-hq" name="is_horizontal">
+                            <label class="form-check-label fw-bold" for="switch-update-hq">가로형(Matrix) 엑셀 파일인가요?</label>
+                        </div>
+
                         <div class="mb-3">
                              <label for="hq_stock_excel_file_full" class="form-label file-upload-wrapper" id="wrapper-hq-file-full">
                                 <i class="bi bi-file-earmark-excel-fill fs-4"></i>
@@ -286,60 +300,56 @@
 
                         <div class="column-mapping-grid mb-3" id="grid-update-hq-full">
                              <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_pn_hq_full">품번*</label>
-                                <select id="col_pn_hq_full" name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_pn_hq_full"></div>
+                                <label class="text-danger fw-bold">품번*</label>
+                                <select name="col_pn" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_color_hq_full">컬러*</label>
-                                <select id="col_color_hq_full" name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_color_hq_full"></div>
+                                <label class="text-danger fw-bold">컬러*</label>
+                                <select name="col_color" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
-                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_size_hq_full">사이즈 (자동)</label>
-                                <select id="col_size_hq_full" name="col_size" class="form-select form-select-sm" disabled><option value="">-- 열 (없으면 자동) --</option></select>
-                                <div class="col-preview" id="preview_col_size_hq_full"></div>
+                            
+                            <div class="mapping-item-wrapper conditional-field" data-show-if="vertical"><div class="mapping-item">
+                                <label class="text-danger fw-bold">사이즈*</label>
+                                <select name="col_size" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_stock_hq_full">본사재고*</label>
-                                <select id="col_stock_hq_full" name="col_hq_stock" class="form-select form-select-sm" required disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_stock_hq_full"></div>
+                            <div class="mapping-item-wrapper conditional-field" data-show-if="vertical"><div class="mapping-item">
+                                <label class="text-danger fw-bold">본사재고*</label>
+                                <select name="col_hq_stock" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_pname_hq_full">품명</label>
-                                <select id="col_pname_hq_full" name="col_pname" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_pname_hq_full"></div>
+                                <label>품명</label>
+                                <select name="col_pname" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_year_hq_full">출시년도</label>
-                                <select id="col_year_hq_full" name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_year_hq_full"></div>
+                                <label>출시년도</label>
+                                <select name="col_year" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_category_hq_full">품목</label>
-                                <select id="col_category_hq_full" name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_category_hq_full"></div>
+                                <label>품목</label>
+                                <select name="col_category" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_oprice_hq_full">최초가</label>
-                                <select id="col_oprice_hq_full" name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_oprice_hq_full"></div>
+                                <label>최초가</label>
+                                <select name="col_oprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_sprice_hq_full">판매가</label>
-                                <select id="col_sprice_hq_full" name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
-                                <div class="col-preview" id="preview_col_sprice_hq_full"></div>
+                                <label>판매가</label>
+                                <select name="col_sprice" class="form-select form-select-sm" disabled><option value="">-- 열 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                             <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_barcode_hq_full">바코드</label>
-                                <select id="col_barcode_hq_full" name="col_barcode" class="form-select form-select-sm" disabled><option value="">-- 선택 --</option></select>
-                                <div class="col-preview" id="preview_col_barcode_hq_full"></div>
-                            </div></div>
-                            <div class="mapping-item-wrapper"><div class="mapping-item">
-                                <label for="col_favorite_hq_full">즐겨찾기</label>
-                                <select id="col_favorite_hq_full" name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 선택 --</option></select>
-                                <div class="col-preview" id="preview_col_favorite_hq_full"></div>
+                                <label>즐겨찾기</label>
+                                <select name="col_favorite" class="form-select form-select-sm" disabled><option value="">-- 선택 --</option></select>
+                                <div class="col-preview"></div>
                             </div></div>
                         </div>
                         
@@ -371,7 +381,7 @@
                 </div>
             </div>
             {% endif %}
-            
+
             {% if not current_user.store_id %}
             <div class="card mb-3 management-section">
                 <div class="card-header">

@@ -15,7 +15,6 @@ from flowork.services.excel import (
     export_db_to_excel,
     export_stock_check_excel,
     verify_stock_excel,
-    _process_stock_update_excel,
     import_excel_file
 )
 
@@ -109,46 +108,6 @@ def inventory_upsert():
     
     return jsonify({'status': 'success', 'task_id': task_id, 'message': '업로드 작업을 시작했습니다.'})
 
-@api_bp.route('/api/inventory/update_stock_excel', methods=['POST'])
-@login_required
-def inventory_update_stock_excel():
-    upload_mode = request.form.get('upload_mode')
-    if upload_mode not in ['hq', 'store']:
-        return jsonify({'status': 'error', 'message': '잘못된 업로드 모드입니다.'}), 400
-
-    if upload_mode == 'hq' and (not current_user.brand_id or current_user.store_id):
-        return jsonify({'status': 'error', 'message': '본사 관리자만 접근 가능합니다.'}), 403
-
-    target_store_id = None
-    if upload_mode == 'store':
-        if current_user.store_id:
-            target_store_id = current_user.store_id
-        elif current_user.is_admin:
-            target_store_id = request.form.get('target_store_id', type=int)
-        
-        if not target_store_id:
-            return jsonify({'status': 'error', 'message': '재고를 업데이트할 매장이 지정되지 않았습니다.'}), 400
-
-    file = request.files.get('excel_file')
-    if not file:
-        return jsonify({'status': 'error', 'message': '파일이 없습니다.'}), 400
-
-    try:
-        current_brand_id = current_user.current_brand_id
-        processed, created, message, category = _process_stock_update_excel(
-            file, 
-            request.form, 
-            upload_mode, 
-            current_brand_id, 
-            target_store_id
-        )
-        flash(message, category)
-        return jsonify({'status': 'success', 'message': message})
-        
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': f'오류: {e}'}), 500
-
 @api_bp.route('/update_store_stock_excel', methods=['POST'])
 @login_required
 def update_store_stock_excel():
@@ -173,47 +132,31 @@ def update_store_stock_excel():
 
     current_brand_id = current_user.current_brand_id
     
-    if 'col_pn' in request.form:
-        task_id = str(uuid.uuid4())
-        TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
-        
-        temp_filename = f"/tmp/store_upsert_{task_id}.xlsx"
-        file.save(temp_filename)
-        
-        excluded_str = request.form.get('excluded_row_indices', '')
-        excluded_indices = [int(x) for x in excluded_str.split(',')] if excluded_str else []
-        
-        thread = threading.Thread(
-            target=run_async_stock_upsert,
-            args=(
-                current_app._get_current_object(), 
-                task_id, 
-                temp_filename, 
-                request.form, 
-                'store', 
-                current_brand_id, 
-                target_store_id,
-                excluded_indices,
-                True 
-            )
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {'status': 'processing', 'current': 0, 'total': 0, 'percent': 0}
+    
+    temp_filename = f"/tmp/store_upsert_{task_id}.xlsx"
+    file.save(temp_filename)
+    
+    excluded_str = request.form.get('excluded_row_indices', '')
+    excluded_indices = [int(x) for x in excluded_str.split(',')] if excluded_str else []
+    
+    thread = threading.Thread(
+        target=run_async_stock_upsert,
+        args=(
+            current_app._get_current_object(), 
+            task_id, 
+            temp_filename, 
+            request.form, 
+            'store', 
+            current_brand_id, 
+            target_store_id,
+            excluded_indices,
+            True 
         )
-        thread.start()
-        return jsonify({'status': 'success', 'task_id': task_id, 'message': '업데이트 작업을 시작했습니다.'})
-
-    elif 'barcode_col' in request.form:
-        try:
-            processed, created, message, category = _process_stock_update_excel(
-                file, request.form, 'store', 
-                current_brand_id, 
-                target_store_id
-            )
-            flash(message, category)
-            return jsonify({'status': 'success', 'message': message})
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': f'오류: {e}'}), 500
-            
-    else:
-        return jsonify({'status': 'error', 'message': '알 수 없는 폼 형식입니다. (열 선택 확인 필요)'}), 400
+    )
+    thread.start()
+    return jsonify({'status': 'success', 'task_id': task_id, 'message': '업데이트 작업을 시작했습니다.'})
 
 @api_bp.route('/export_db_excel')
 @login_required

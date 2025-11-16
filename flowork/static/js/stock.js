@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // [수정] CSRF 토큰 가져오기
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    
     const analyzeExcelUrl = document.body.dataset.analyzeExcelUrl;
     
     function setupExcelAnalyzer(config) {
@@ -68,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- 이벤트 리스너: 파일 선택 및 분석 ---
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) {
@@ -91,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(analyzeExcelUrl, {
                     method: 'POST',
                     headers: {
-                        'X-CSRFToken': csrfToken // [수정] CSRF 토큰 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: formData
                 });
@@ -122,13 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- 이벤트 리스너: 열 선택 시 미리보기 ---
         grid.addEventListener('change', (e) => {
             if (e.target.tagName !== 'SELECT') return;
 
             const selectedLetter = e.target.value;
-            const previewId = `preview_${e.target.id}`;
-            const previewEl = document.getElementById(previewId);
+            const mappingItem = e.target.closest('.mapping-item');
+            const previewEl = mappingItem ? mappingItem.querySelector('.col-preview') : null;
 
             if (!previewEl) return;
 
@@ -142,34 +138,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- 이벤트 리스너: 폼 제출 (검증 -> 모달 -> 업로드) ---
-        if (form && (formId === 'form-update-store' || formId === 'form-update-hq-full')) {
+        if (form) {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
-                // HTML confirm 처리
                 const msg = '엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?';
-                
                 if (!confirm(msg)) return;
 
                 const formData = new FormData(form);
                 
-                // [수정] formId에 따라 upload_mode 자동 설정 (HTML hidden input이 없거나 확실히 하기 위해)
-                let uploadMode = 'store';
-                if (formId === 'form-update-hq-full') uploadMode = 'hq';
-                formData.append('upload_mode', uploadMode);
-
                 if (submitButton) {
                     submitButton.disabled = true;
                     submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 데이터 검증 중...';
                 }
 
                 try {
-                    // 1. 검증 API 호출
                     const verifyResp = await fetch('/api/verify_excel', {
                         method: 'POST',
                         headers: {
-                            'X-CSRFToken': csrfToken // [수정] CSRF 토큰 헤더 추가
+                            'X-CSRFToken': csrfToken
                         },
                         body: formData
                     });
@@ -186,13 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         throw new Error(verifyResult.message);
                     }
 
-                    // 2. 의심 행 확인
                     const suspiciousRows = verifyResult.suspicious_rows || [];
                     
                     if (suspiciousRows.length > 0) {
                         showVerificationModal(suspiciousRows, formData);
                     } else {
-                        // 의심 행 없으면 바로 업로드
                         startUploadProcess(formData);
                     }
 
@@ -201,17 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(`검증 중 오류 발생:\n${error.message}\n\n(로그인이 만료되었거나 서버에 문제가 있을 수 있습니다.)`);
                     resetSubmitButton();
                 }
-            });
-        }
-        // [신규] DB Import 폼 처리 (검증 없이 바로 업로드 시작)
-        else if (form && formId === 'form-import-db') {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const formData = new FormData(form);
-                // upload_mode='db'는 HTML form action URL 파라미터로 전달되거나 hidden input으로 있을 수 있음
-                // 여기서는 formData 그대로 전송
-                startUploadProcess(formData);
             });
         }
 
@@ -303,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(actionUrl, {
                     method: 'POST',
                     headers: {
-                        'X-CSRFToken': csrfToken // [수정] CSRF 토큰 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: formData
                 });
@@ -379,19 +353,39 @@ document.addEventListener('DOMContentLoaded', () => {
         function resetSubmitButton() {
             if (submitButton) {
                 submitButton.disabled = false;
-                const isHq = formId.includes('hq');
-                
-                if (formId === 'form-import-db') {
-                    submitButton.innerHTML = '<i class="bi bi-upload me-1"></i>상품 DB 전체 업로드';
-                } else {
-                    // hq면 '본사재고', store면 '매장재고' (텍스트는 대략적으로 복원)
-                    submitButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i> ${isHq ? '본사재고 업로드' : '검토 및 업데이트'}`;
-                }
+                submitButton.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i> 검토 및 업로드';
             }
         }
     }
+    
+    function initModeSwitches() {
+        const switches = document.querySelectorAll('.horizontal-mode-switch');
+        switches.forEach(sw => {
+            sw.addEventListener('change', (e) => {
+                const form = e.target.closest('form');
+                const isHorizontal = e.target.checked;
+                const conditionalFields = form.querySelectorAll('.conditional-field[data-show-if="vertical"]');
+                
+                conditionalFields.forEach(wrapper => {
+                    if (isHorizontal) {
+                        wrapper.style.display = 'none';
+                    } else {
+                        wrapper.style.display = 'block';
+                    }
+                });
+            });
+            
+            const form = sw.closest('form');
+            const conditionalFields = form.querySelectorAll('.conditional-field[data-show-if="vertical"]');
+            if (sw.checked) {
+                conditionalFields.forEach(w => w.style.display = 'none');
+            } else {
+                conditionalFields.forEach(w => w.style.display = 'block');
+            }
+        });
+    }
+    initModeSwitches();
 
-    // --- 초기화 (매장 재고 폼) ---
     const storeConfig = {
         fileInputId: 'store_stock_excel_file',
         formId: 'form-update-store',
@@ -403,7 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setupExcelAnalyzer(storeConfig);
     }
     
-    // --- 초기화 (본사 재고 폼 - UPSERT) ---
     const hqConfigFull = {
         fileInputId: 'hq_stock_excel_file_full',
         formId: 'form-update-hq-full',
@@ -415,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setupExcelAnalyzer(hqConfigFull);
     }
 
-    // --- 초기화 (DB Import) ---
     const dbImportConfig = {
         fileInputId: 'db_excel_file',
         formId: 'form-import-db',

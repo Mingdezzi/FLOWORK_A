@@ -391,35 +391,6 @@ def reset_store_db():
     
     return redirect(url_for('ui.setting_page'))
 
-@api_bp.route('/reset_database_completely', methods=['POST'])
-@admin_required
-def reset_database_completely():
-    if not current_user.brand_id or current_user.store_id:
-        abort(403, description="상품 데이터 초기화는 본사 관리자만 가능합니다.")
-        
-    try:
-        db.session.query(Order).update({Order.product_id: None})
-        
-        db.session.query(StockHistory).delete()
-        db.session.query(SaleItem).delete()
-        db.session.query(Sale).delete()
-        db.session.query(StoreStock).delete()
-        db.session.query(Variant).delete()
-        db.session.query(Product).delete()
-        
-        db.session.commit()
-        
-        db.create_all()
-        
-        flash('상품 데이터 초기화 완료. (상품/옵션/재고/매출/재고이력 삭제됨. 계정/주문 내역 보존)', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'DB 초기화 오류: {e}', 'error')
-        print(f"DB Reset Error: {e}")
-        traceback.print_exc()
-    
-    return redirect(url_for('ui.stock_management'))
-
 @api_bp.route('/sync_missing_data', methods=['POST'])
 @login_required
 def sync_missing_data():

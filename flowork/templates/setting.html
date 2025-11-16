@@ -362,22 +362,16 @@
 
                         <h6 class="text-muted mt-3 border-bottom pb-2">본사 DB 관리 (브랜드 공통)</h6>
                         <div class="row g-3">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <a href="{{ url_for('api.export_db_excel') }}" class="btn btn-primary w-100"><i class="bi bi-database-down me-2"></i>(3-4) 본사 DB 백업</a>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <form action="{{ url_for('api.inventory_upsert') }}" method="POST" enctype="multipart/form-data" class="input-group">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="upload_mode" value="db">
                                     <input type="hidden" name="is_full_import" value="true">
                                     <input type="file" name="excel_file" class="form-control" required>
                                     <button type="submit" class="btn btn-success"><i class="bi bi-database-up"></i> (3-5) 복구</button>
-                                </form>
-                            </div>
-                            <div class="col-md-4">
-                                <form action="{{ url_for('api.reset_database_completely') }}" method="POST" onsubmit="return confirm('🚨 경고: 본사 상품/옵션 DB가 완전히 삭제됩니다.');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-danger w-100"><i class="bi bi-exclamation-triangle-fill me-2"></i>(3-6) DB 초기화</button>
                                 </form>
                             </div>
                         </div>
@@ -501,7 +495,6 @@
     <script>
         window.initialCategoryConfig = {{ category_config | tojson | safe if category_config else 'null' }};
         
-        // 드롭다운 값 변경 시 hidden input 업데이트 (본사 관리자용)
         function updateHiddenInputs(selectId) {
             const select = document.getElementById(selectId);
             if (!select) return;
@@ -512,21 +505,18 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 주문 탭 드롭다운
             const ordersSelect = document.getElementById('orders_target_store');
             if (ordersSelect) {
                 ordersSelect.addEventListener('change', () => updateHiddenInputs('orders_target_store'));
-                updateHiddenInputs('orders_target_store'); // 초기값 반영
+                updateHiddenInputs('orders_target_store');
             }
             
-            // 재고 탭 드롭다운
             const stockSelect = document.getElementById('stock_target_store');
             if (stockSelect) {
                 stockSelect.addEventListener('change', () => updateHiddenInputs('stock_target_store'));
-                updateHiddenInputs('stock_target_store'); // 초기값 반영
+                updateHiddenInputs('stock_target_store'); 
             }
 
-            // 설정 파일 로드 로직
             const loadSettingsBtn = document.getElementById('btn-load-settings');
             const loadSettingsStatus = document.getElementById('load-settings-status');
             const loadSettingsUrl = document.body.dataset.apiLoadSettingsUrl;
