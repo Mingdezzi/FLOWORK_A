@@ -21,7 +21,8 @@ class StoreOrder(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now)
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=datetime.now)
     
-    store = db.relationship('Store', backref='orders')
+    # [수정] backref 이름을 'orders' -> 'store_orders'로 변경 (충돌 방지)
+    store = db.relationship('Store', backref='store_orders')
     variant = db.relationship('Variant')
 
     __table_args__ = (
@@ -47,7 +48,8 @@ class StoreReturn(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now)
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=datetime.now)
     
-    store = db.relationship('Store', backref='returns')
+    # [수정] backref 이름을 'returns' -> 'store_returns'로 변경 (명확성 및 충돌 방지)
+    store = db.relationship('Store', backref='store_returns')
     variant = db.relationship('Variant')
 
     __table_args__ = (
