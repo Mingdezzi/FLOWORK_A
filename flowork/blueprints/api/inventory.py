@@ -5,10 +5,10 @@ import threading
 import traceback
 from flask import request, jsonify, send_file, flash, redirect, url_for, current_app, abort
 from flask_login import login_required, current_user
-from sqlalchemy import or_, delete
+from sqlalchemy import or_, delete, exc
 from sqlalchemy.orm import selectinload
 
-from flowork.models import db, Product, Variant, StoreStock, Setting, Store
+from flowork.models import db, Product, Variant, StoreStock, Setting, Store, StockHistory
 from flowork.utils import clean_string_upper, get_choseong, generate_barcode, get_sort_key
 
 from flowork.services.excel import (
@@ -892,3 +892,43 @@ def api_order_product_search():
         return jsonify({'status': 'success', 'products': results})
     else:
         return jsonify({'status': 'error', 'message': f"'{query}'(으)로 검색된 상품이 없습니다."}), 404
+
+@api_bp.route('/api/reset_database_completely', methods=['POST'])
+@admin_required
+def reset_database_completely():
+    if current_user.store_id:
+        abort(403, description="본사 관리자만 가능합니다.")
+    
+    try:
+        brand_id = current_user.current_brand_id
+        
+        # 1. Get store IDs for the brand
+        store_ids_query = db.session.query(Store.id).filter_by(brand_id=brand_id)
+        
+        # 2. Delete StockHistory (Referencing Variant and Store)
+        db.session.query(StockHistory).filter(StockHistory.store_id.in_(store_ids_query)).delete(synchronize_session=False)
+
+        # 3. Delete StoreStock (Referencing Variant and Store)
+        db.session.query(StoreStock).filter(StoreStock.store_id.in_(store_ids_query)).delete(synchronize_session=False)
+        
+        # 4. Get product IDs for the brand
+        product_ids_query = db.session.query(Product.id).filter_by(brand_id=brand_id)
+
+        # 5. Delete Variants (Referencing Product)
+        db.session.query(Variant).filter(Variant.product_id.in_(product_ids_query)).delete(synchronize_session=False)
+
+        # 6. Delete Products
+        db.session.query(Product).filter_by(brand_id=brand_id).delete(synchronize_session=False)
+        
+        db.session.commit()
+        flash("상품, 옵션, 재고 데이터가 초기화되었습니다.", "success")
+        
+    except exc.IntegrityError:
+        db.session.rollback()
+        flash("사용 중인 상품(주문/판매내역 등)이 있어 삭제할 수 없습니다. 판매/주문 내역을 먼저 초기화해주세요.", "error")
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        flash(f"초기화 오류: {e}", "error")
+
+    return redirect(url_for('ui.stock_management'))
