@@ -1,11 +1,11 @@
 <div class="nav-container mb-4">
-    <div class="nav-category-grid">
+    <div class="nav-category-grid" id="nav-accordion">
         
         <div class="nav-group">
-            <button class="btn btn-nav-category" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sales" aria-expanded="false">
+            <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sales" aria-expanded="false">
                 판매관리
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-sales">
+            <div class="collapse nav-sub-items" id="nav-sales" data-bs-parent="#nav-accordion">
                 <a href="{{ url_for('ui.sales_register') }}" class="btn btn-nav-item {{ 'active' if active_page == 'sales' else '' }}">
                     판매등록 (sales)
                 </a>
@@ -22,17 +22,17 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-return" aria-expanded="false">
                 주문반품
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-return">
+            <div class="collapse nav-sub-items" id="nav-return" data-bs-parent="#nav-accordion">
                 <a href="#" class="btn btn-nav-item disabled">주문등록</a>
                 <a href="#" class="btn btn-nav-item disabled">반품등록</a>
-                <div class="empty-slot"></div> </div>
+            </div>
         </div>
 
         <div class="nav-group">
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-stock" aria-expanded="false">
                 재고관리
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-stock">
+            <div class="collapse nav-sub-items" id="nav-stock" data-bs-parent="#nav-accordion">
                 <a href="{{ url_for('ui.search_page') }}" class="btn btn-nav-item {{ 'active' if active_page == 'search' else '' }}">
                     상품검색 (search)
                 </a>
@@ -49,7 +49,7 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-move" aria-expanded="false">
                 수평이동
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-move">
+            <div class="collapse nav-sub-items" id="nav-move" data-bs-parent="#nav-accordion">
                 <a href="#" class="btn btn-nav-item disabled">수평출고</a>
                 <a href="#" class="btn btn-nav-item disabled">수평입고</a>
                 <a href="#" class="btn btn-nav-item disabled">수평현황</a>
@@ -60,10 +60,9 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-customer" aria-expanded="false">
                 고객관리
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-customer">
+            <div class="collapse nav-sub-items" id="nav-customer" data-bs-parent="#nav-accordion">
                 <a href="#" class="btn btn-nav-item disabled">고객등록</a>
                 <a href="#" class="btn btn-nav-item disabled">수선접수</a>
-                <div class="empty-slot"></div>
             </div>
         </div>
 
@@ -71,7 +70,7 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-ops" aria-expanded="false">
                 매장운영
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-ops">
+            <div class="collapse nav-sub-items" id="nav-ops" data-bs-parent="#nav-accordion">
                 <a href="{{ url_for('ui.schedule') }}" class="btn btn-nav-item {{ 'active' if active_page == 'schedule' else '' }}">
                     매장일정 (schedule)
                 </a>
@@ -84,7 +83,7 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-network" aria-expanded="false">
                 네트워크
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-network">
+            <div class="collapse nav-sub-items" id="nav-network" data-bs-parent="#nav-accordion">
                 <a href="{{ url_for('ui.announcement_list') }}" class="btn btn-nav-item {{ 'active' if active_page == 'announcements' else '' }}">
                     공지사항
                 </a>
@@ -97,14 +96,13 @@
             <button class="btn btn-nav-category collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nav-settings" aria-expanded="false">
                 전체설정
             </button>
-            <div class="collapse nav-sub-items show-on-pc" id="nav-settings">
+            <div class="collapse nav-sub-items" id="nav-settings" data-bs-parent="#nav-accordion">
                 <a href="{{ url_for('ui.stock_management') }}" class="btn btn-nav-item {{ 'active' if active_page == 'stock' else '' }}">
                     재고설정 (stock)
                 </a>
                 <a href="{{ url_for('ui.setting_page') }}" class="btn btn-nav-item {{ 'active' if active_page == 'setting' else '' }}">
                     일반설정 (setting)
                 </a>
-                <div class="empty-slot"></div>
             </div>
         </div>
 
