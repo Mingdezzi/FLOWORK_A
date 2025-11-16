@@ -35,8 +35,8 @@
                 </div>
                 <div class="card-body">
                      <div class="card-description">
-                        <strong>현재 브랜드의 상품 데이터(STOCK_INFO) 를 엑셀로 백업합니다.</strong>
-                        <span>(상품, 품목, 가격, **본사 재고**, **즐겨찾기** 포함) (매장 재고는 포함되지 않습니다.)</span>
+                        <strong>브랜드의 상품 DB 를 엑셀로 백업합니다.</strong>
+                        <span>매장 재고는 포함되지 않습니다.</span>
                     </div>
                     <a href="{{ url_for('api.export_db_excel') }}" class="btn btn-success"><i class="bi bi-download me-1"></i>엑셀 다운로드</a>
                 </div>
@@ -48,8 +48,8 @@
                 </div>
                 <div class="card-body">
                     <div class="card-description">
-                        <strong>(요청) 엑셀 파일로 상품 데이터(STOCK_INFO)를 재설정합니다.</strong>
-                        <span>(경고) 현재 브랜드의 기존 상품/옵션/재고 DB가 **모두 삭제**되고 엑셀 내용으로 덮어씁니다.</span>
+                        <strong>상품 DB 를 재설정합니다.</strong>
+                        <span>※경고※ 기존 상품 DB 를 모두 삭제하고, 업로드 된 파일로 재설정 됩니다. <br>이 과정은 절대 돌이킬 수 없습니다. </span>
                     </div>
                     <form action="{{ url_for('api.inventory_upsert') }}" method="POST" enctype="multipart/form-data" 
                           class="update-stock-form" id="form-import-db"
@@ -62,7 +62,7 @@
                             <div class="form-check">
                                 <input class="form-check-input horizontal-mode-switch" type="checkbox" id="check-import-db" name="is_horizontal">
                                 <label class="form-check-label fw-bold" for="check-import-db">
-                                    가로형(Matrix) 엑셀 파일 (사이즈가 가로로 나열됨)
+                                    가로형 엑셀 파일 여부 체크
                                 </label>
                             </div>
                         </div>
@@ -147,7 +147,7 @@
                 </div>
                 <div class="card-body">
                     <div class="card-description">
-                        <strong>(STOCK_ST) 매장재고를 업데이트 (추가/수정) 합니다.</strong>
+                        <strong>매장재고를 업데이트 (추가/수정) 합니다.</strong>
                         <span>(1) '파일 선택' -> (2) 열 분석 -> (3) 열 매핑 -> (4) '검토 및 업데이트' 클릭<br>
                         (DB에 없는 상품/옵션은 자동으로 생성되며, 기존 상품은 가격/재고가 수정됩니다.)</span>
                     </div>
@@ -175,7 +175,7 @@
                             <div class="form-check">
                                 <input class="form-check-input horizontal-mode-switch" type="checkbox" id="check-update-store" name="is_horizontal">
                                 <label class="form-check-label fw-bold" for="check-update-store">
-                                    가로형(Matrix) 엑셀 파일 (사이즈가 가로로 나열됨)
+                                    가로형 엑셀 파일 여부 체크
                                 </label>
                             </div>
                         </div>
@@ -284,7 +284,8 @@
                 <div class="card-body">
                     <div class="card-description">
                         <strong>(STOCK_HQ) 엑셀 파일로 '본사 재고' 및 '상품 정보'를 (추가/수정)합니다.</strong>
-                        <span>(1) '파일 선택' -> (2) 열 분석 -> (3) 열 매핑 -> (4) '본사재고 업로드' 클릭</span>
+                        <span>(1) '파일 선택' -> (2) 열 분석 -> (3) 열 매핑 -> (4) '본사재고 업로드' 클릭<br>
+                        (DB에 없는 상품/옵션은 자동으로 생성되며, 기존 상품은 가격/재고가 수정됩니다.)</span>
                     </div>
                     
                     <form id="form-update-hq-full" class="update-stock-form" action="{{ url_for('api.inventory_upsert') }}" method="POST" enctype="multipart/form-data" onsubmit="return confirm('엑셀 파일 검증을 시작합니다.\n검증 후 문제가 없는 행만 업로드됩니다.\n계속하시겠습니까?');">

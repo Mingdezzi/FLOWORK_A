@@ -61,7 +61,7 @@
                             <input type="date" class="form-control editable-on-demand" id="created_at" name="created_at"
                                    value="{{ (data.created_at or default_created_at).strftime('%Y-%m-%d') if (data or default_created_at) else '' }}" required
                                    {{ 'readonly' if is_view_mode else '' }}>
-                            <div class="form-text">기본값은 오늘 날짜이며, 수정 가능합니다.</div>
+                            <div class="form-text"></div>
                         </div>
                     </div>
 
