@@ -22,6 +22,9 @@ def setting_page():
         staff_list = []
         hq_store_id_setting = None
         category_config = None
+        
+        expected_filename = None
+        loaded_settings_file = None
 
         if current_brand_id:
             brand_name_setting = Setting.query.filter_by(brand_id=current_brand_id, key='BRAND_NAME').first()
@@ -41,6 +44,15 @@ def setting_page():
                         category_config = json.loads(category_setting.value)
                     except json.JSONDecodeError:
                         pass
+                
+                if brand:
+                    expected_filename = f"{brand.brand_name}.json"
+                loaded_setting = Setting.query.filter_by(
+                    brand_id=current_brand_id, 
+                    key='LOADED_SETTINGS_FILE'
+                ).first()
+                if loaded_setting:
+                    loaded_settings_file = loaded_setting.value
         
         if my_store_id:
             staff_list = Staff.query.filter(Staff.store_id == my_store_id, Staff.is_active == True).order_by(Staff.name).all()
@@ -52,7 +64,9 @@ def setting_page():
             'all_stores': all_stores_in_brand, 
             'staff_list': staff_list,
             'hq_store_id_setting': hq_store_id_setting,
-            'category_config': category_config
+            'category_config': category_config,
+            'expected_settings_file': expected_filename,
+            'loaded_settings_file': loaded_settings_file
         }
         return render_template('setting.html', **context)
     
