@@ -4,9 +4,8 @@ import aiohttp
 import io
 import random
 import traceback
+import json
 from PIL import Image, ImageDraw, ImageFont
-# [수정] 상단 import 제거 (Lazy Import 적용)
-# from rembg import remove 
 from flask import current_app
 from flowork.extensions import db
 from flowork.models import Product, Setting
@@ -17,6 +16,7 @@ RESAMPLE_LANCZOS = Image.Resampling.LANCZOS
 def process_style_code_group(brand_id, style_code):
     products = []
     try:
+        # 0. 상품 조회
         products = Product.query.filter_by(brand_id=brand_id).filter(
             Product.product_number.like(f"{style_code}%")
         ).all()
@@ -24,17 +24,18 @@ def process_style_code_group(brand_id, style_code):
         if not products:
             return False, "해당 품번의 상품이 없습니다."
 
-        drive_service = get_drive_service(products[0].brand.brand_name)
+        # 1. 구글 드라이브 설정 로드 및 연결
+        drive_settings = _get_google_drive_settings(brand_id)
+        key_filename = drive_settings.get('SERVICE_ACCOUNT_FILE')
+        
+        drive_service = get_drive_service(key_filename)
         if not drive_service:
             _update_product_status(products, 'FAILED')
-            return False, "Google Drive 연결 실패 (인증 파일 확인 필요)"
+            return False, f"Google Drive 연결 실패 (키 파일: {key_filename} 확인 필요)"
 
+        # 2. 컬러별 옵션 그룹화
         variants_map = {}
         for p in products:
-            color_code = ""
-            if len(p.product_number) >= len(style_code) + 2:
-                color_code = p.product_number[len(style_code):len(style_code)+2]
-            
             # DB의 Variant 테이블에서 컬러 정보를 조회
             color_name = "UnknownColor"
             if p.variants and len(p.variants) > 0:
@@ -55,34 +56,39 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED')
             return False, "처리할 컬러 옵션을 찾을 수 없습니다."
 
+        # 3. 임시 폴더 생성
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_images', style_code)
         os.makedirs(temp_dir, exist_ok=True)
 
+        # 4. 이미지 다운로드 (비동기)
         patterns_config = _get_brand_url_patterns(brand_id)
-        
         asyncio.run(_download_all_variants(style_code, variants_map, patterns_config, temp_dir))
 
+        # 5. 배경 제거 (대표 이미지 1장)
         valid_variants = []
         for color_name, data in variants_map.items():
             if data['files']['DF']:
                 rep_image_path = data['files']['DF'][0]
-                # 배경 제거 함수 호출
                 nobg_path = _remove_background(rep_image_path)
                 if nobg_path:
                     data['files']['NOBG'] = nobg_path
                     valid_variants.append(data)
+            # DF가 없고 DM만 있는 경우 등은 정책에 따라 처리 (현재는 DF 필수)
 
         if not valid_variants:
             _update_product_status(products, 'FAILED')
             return False, "이미지 다운로드 실패 또는 배경 제거 실패"
 
+        # 6. 썸네일 및 상세 이미지 생성
         thumbnail_path = _create_thumbnail(valid_variants, temp_dir, style_code)
         detail_path = _create_detail_image(valid_variants, temp_dir, style_code)
 
+        # 7. 구글 드라이브 업로드
         result_links = _upload_structure_to_drive(
-            drive_service, brand_id, style_code, variants_map, thumbnail_path, detail_path
+            drive_service, drive_settings, style_code, variants_map, thumbnail_path, detail_path
         )
 
+        # 8. DB 업데이트
         _update_product_db(products, result_links)
         
         return True, f"성공: {len(valid_variants)}개 컬러 처리 완료"
@@ -125,23 +131,21 @@ def _update_product_db(products, links):
 def _get_brand_url_patterns(brand_id):
     setting = Setting.query.filter_by(brand_id=brand_id, key='IMAGE_DOWNLOAD_PATTERNS').first()
     if setting and setting.value:
-        import json
         try:
             return json.loads(setting.value)
         except:
             pass
     return {}
 
-def _get_brand_root_folder_id(brand_id):
+def _get_google_drive_settings(brand_id):
+    """구글 드라이브 설정 전체 로드"""
     setting = Setting.query.filter_by(brand_id=brand_id, key='GOOGLE_DRIVE_SETTINGS').first()
     if setting and setting.value:
-        import json
         try:
-            data = json.loads(setting.value)
-            return data.get('TARGET_FOLDER_ID')
+            return json.loads(setting.value)
         except:
             pass
-    return None
+    return {}
 
 async def _download_all_variants(style_code, variants_map, patterns_config, save_dir):
     connector = aiohttp.TCPConnector(limit=10)
@@ -153,7 +157,7 @@ async def _download_all_variants(style_code, variants_map, patterns_config, save
             year = "20" + style_code[3:5]
 
         for color_name, data in variants_map.items():
-            # 다운로드 시 사용할 'Product Code'는 DB의 product_number 그대로 사용
+            # 다운로드 시 사용할 품번은 DB값 그대로 사용
             full_code = data['product'].product_number 
             
             color_dir = os.path.join(save_dir, color_name)
@@ -209,21 +213,19 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
             num += 1
             consecutive_failures = 0
         else:
+            # 연속 실패 시 중단
             consecutive_failures += 1
             if consecutive_failures >= 1: 
                 break
 
 def _remove_background(input_path):
-    """배경 제거 함수 (Lazy Import 적용)"""
     try:
-        # [중요] 여기서 import하여 서버 부팅 속도를 높이고 메모리 이슈 방지
         from rembg import remove
         
         name, ext = os.path.splitext(input_path)
         output_path = f"{name}_nobg.png"
         
-        # AI 모델 저장 경로 지정 (Render 등에서 권한 문제 방지)
-        # u2net 모델이 없으면 최초 1회 다운로드됨
+        # AI 모델 저장 경로 지정
         model_home = os.path.join(current_app.config['UPLOAD_FOLDER'], 'models')
         os.environ['U2NET_HOME'] = model_home
         os.makedirs(model_home, exist_ok=True)
@@ -340,9 +342,10 @@ def _create_detail_image(variants, temp_dir, style_code):
         print(f"Detail image creation error: {e}")
         return None
 
-def _upload_structure_to_drive(service, brand_id, style_code, variants_map, thumb_path, detail_path):
-    root_id = _get_brand_root_folder_id(brand_id)
+def _upload_structure_to_drive(service, settings, style_code, variants_map, thumb_path, detail_path):
+    root_id = settings.get('TARGET_FOLDER_ID')
     
+    # 품번 폴더 생성
     product_folder_id = get_or_create_folder(service, style_code, root_id)
     
     result = {'drive_folders': {}, 'thumbnail': None, 'detail': None}
@@ -367,9 +370,9 @@ def _upload_structure_to_drive(service, brand_id, style_code, variants_map, thum
 
         for path in data['files']['DF']:
             upload_file_to_drive(service, path, os.path.basename(path), original_folder_id)
-            
+        
         for path in data['files']['DG']:
-             pass 
+             pass # DG 업로드 로직 필요 시 추가
 
         if data['files']['NOBG']:
             upload_file_to_drive(service, data['files']['NOBG'], os.path.basename(data['files']['NOBG']), nobg_folder_id)
