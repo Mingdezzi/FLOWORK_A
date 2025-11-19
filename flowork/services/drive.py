@@ -4,7 +4,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from flask import current_app
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ['https://www.googleapis.com/auth/drive']  # [수정] 권한 범위를 넓힘 (drive.file -> drive)
 
 def get_drive_service(key_filename=None):
     """
@@ -35,7 +35,13 @@ def get_or_create_folder(service, folder_name, parent_id=None):
     if parent_id:
         query += f" and '{parent_id}' in parents"
         
-    results = service.files().list(q=query, fields="files(id, name)").execute()
+    # [수정] supportsAllDrives=True 추가
+    results = service.files().list(
+        q=query, 
+        fields="files(id, name)",
+        supportsAllDrives=True, 
+        includeItemsFromAllDrives=True
+    ).execute()
     files = results.get('files', [])
     
     if files:
@@ -48,7 +54,12 @@ def get_or_create_folder(service, folder_name, parent_id=None):
         if parent_id:
             file_metadata['parents'] = [parent_id]
         
-        folder = service.files().create(body=file_metadata, fields='id').execute()
+        # [수정] supportsAllDrives=True 추가
+        folder = service.files().create(
+            body=file_metadata, 
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
         return folder.get('id')
 
 def upload_file_to_drive(service, file_path, filename, parent_id=None):
@@ -62,16 +73,20 @@ def upload_file_to_drive(service, file_path, filename, parent_id=None):
         
     media = MediaFileUpload(file_path, resumable=True)
     
+    # [수정] supportsAllDrives=True 추가
     file = service.files().create(
         body=file_metadata,
         media_body=media,
-        fields='id, webContentLink'
+        fields='id, webContentLink',
+        supportsAllDrives=True
     ).execute()
     
     # 권한 설정: 링크가 있는 누구나 읽기 가능 (이미지 호스팅용)
+    # [수정] supportsAllDrives=True 추가
     service.permissions().create(
         fileId=file.get('id'),
-        body={'type': 'anyone', 'role': 'reader'}
+        body={'type': 'anyone', 'role': 'reader'},
+        supportsAllDrives=True
     ).execute()
     
     return file.get('webContentLink')
