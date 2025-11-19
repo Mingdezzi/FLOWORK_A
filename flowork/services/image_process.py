@@ -92,7 +92,7 @@ def process_style_code_group(brand_id, style_code):
                     data['files']['NOBG'] = nobg_path
                     valid_variants.append(data)
             
-            # 모델컷(DM)만 있는 경우도 유효한 데이터로 간주할지 결정 (현재는 DF 우선)
+            # 모델컷(DM)만 있는 경우도 유효한 데이터로 간주 (썸네일엔 못 쓰더라도 드라이브엔 올림)
             elif data['files']['DM']:
                  valid_variants.append(data)
 
@@ -164,7 +164,6 @@ def _load_brand_config_from_file(brand_id):
         brand = db.session.get(Brand, brand_id)
         if not brand: return None
         
-        # brands 폴더에서 파일 찾기
         json_path = os.path.join(current_app.root_path, 'brands', f'{brand.brand_name}.json')
         if os.path.exists(json_path):
             with open(json_path, 'r', encoding='utf-8') as f:
@@ -210,12 +209,20 @@ async def _download_all_variants(style_code, variants_map, patterns_config, save
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = []
         
+        # 연도 추론 (JUP24... -> 24 -> 2024)
         year = ""
         if len(style_code) >= 5 and style_code[3:5].isdigit():
             year = "20" + style_code[3:5]
 
         for color_name, data in variants_map.items():
-            full_code = data['product'].product_number 
+            # [수정] URL 생성용 코드 = 품번(StyleCode) + 컬러(Color)
+            # 예: JUP24301 + NA -> JUP24301NA
+            
+            p_num = data['product'].product_number
+            c_code = color_name.strip() if color_name and color_name != "UnknownColor" else ""
+            
+            # 품번과 컬러를 합쳐서 완전한 코드를 만듦
+            full_code = f"{p_num}{c_code}"
             
             color_dir = os.path.join(save_dir, color_name)
             os.makedirs(color_dir, exist_ok=True)
@@ -238,7 +245,7 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
     while True:
         found_any_pattern = False
         
-        # 01, 1, 001 포맷 시도
+        # 01, 1, 001 등 다양한 번호 포맷 시도
         num_formats = [f"{num:02d}", f"{num}", f"{num:03d}"]
         
         for num_fmt in num_formats: 
@@ -270,6 +277,7 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
             num += 1
             consecutive_failures = 0
         else:
+            # 연속 실패 시 중단
             consecutive_failures += 1
             if consecutive_failures >= 1: 
                 break
@@ -401,10 +409,12 @@ def _create_detail_image(variants, temp_dir, style_code):
 def _upload_structure_to_drive(service, settings, style_code, variants_map, thumb_path, detail_path):
     root_id = settings.get('TARGET_FOLDER_ID')
     
+    # 1. 품번 폴더 생성
     product_folder_id = get_or_create_folder(service, style_code, root_id)
     
     result = {'drive_folders': {}, 'thumbnail': None, 'detail': None}
 
+    # 2. 썸네일/상세 폴더 및 파일 업로드
     if thumb_path:
         thumb_folder_id = get_or_create_folder(service, 'THUMBNAIL', product_folder_id)
         link = upload_file_to_drive(service, thumb_path, f"{style_code}_thumb.png", thumb_folder_id)
@@ -415,6 +425,7 @@ def _upload_structure_to_drive(service, settings, style_code, variants_map, thum
         link = upload_file_to_drive(service, detail_path, f"{style_code}_detail.png", detail_folder_id)
         result['detail'] = link
 
+    # 3. 컬러별 폴더 및 이미지 업로드
     for color_name, data in variants_map.items():
         color_folder_id = get_or_create_folder(service, color_name, product_folder_id)
         result['drive_folders'][color_name] = f"https://drive.google.com/drive/folders/{color_folder_id}"
