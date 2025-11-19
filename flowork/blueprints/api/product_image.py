@@ -16,16 +16,14 @@ def get_product_image_status():
         return jsonify({'status': 'error', 'message': '브랜드 계정이 필요합니다.'}), 403
 
     try:
-        # 1. 상품 및 옵션 정보 로드 (N+1 방지)
+        # 1. 상품 및 옵션 정보 로드
         products = Product.query.options(selectinload(Product.variants))\
             .filter_by(brand_id=current_user.current_brand_id).all()
         
         groups = {}
         for p in products:
-            # [수정] 품번 자르지 않고 그대로 사용
             style_code = p.product_number
             
-            # 품번별 그룹핑 (이미 같은 품번이면 덮어쓰거나 정보 갱신)
             if style_code not in groups:
                 groups[style_code] = {
                     'style_code': style_code,
@@ -33,16 +31,14 @@ def get_product_image_status():
                     'total_colors': 0,
                     'status': 'READY',
                     'thumbnail': None,
-                    'detail': None
+                    'detail': None,
+                    'message': ''
                 }
             
             group = groups[style_code]
-            
-            # 컬러 수 계산: Variant 개수 합산 (또는 유니크 컬러 수)
             unique_colors = set(v.color for v in p.variants if v.color)
             group['total_colors'] = len(unique_colors) if unique_colors else 1
             
-            # 상태 및 이미지 링크 업데이트
             _update_group_status_and_links(group, p)
 
     except Exception as e:
@@ -57,7 +53,7 @@ def get_product_image_status():
     return jsonify({'status': 'success', 'data': result_list})
 
 def _update_group_status_and_links(group, product):
-    """그룹 상태 및 대표 이미지 링크 최신화"""
+    """그룹 상태 및 정보 최신화"""
     current_status = group['status']
     item_status = product.image_status or 'READY'
     
@@ -69,11 +65,19 @@ def _update_group_status_and_links(group, product):
     elif item_status == 'COMPLETED' and current_status == 'READY':
         group['status'] = 'COMPLETED'
         
-    # 썸네일/상세이미지 링크 (있으면 채움)
+    # 썸네일/상세이미지 링크
     if product.thumbnail_url and not group['thumbnail']:
         group['thumbnail'] = product.thumbnail_url
     if product.detail_image_url and not group['detail']:
         group['detail'] = product.detail_image_url
+        
+    # 에러 메시지나 상태 메시지 저장
+    if product.last_message:
+        # 실패 메시지가 있으면 우선 표시
+        if item_status == 'FAILED':
+            group['message'] = product.last_message
+        elif not group['message']:
+            group['message'] = product.last_message
 
 @api_bp.route('/api/product/images/process', methods=['POST'])
 @login_required
@@ -90,13 +94,13 @@ def trigger_image_process():
     try:
         # 1. 선택된 품번들의 상태를 PROCESSING으로 변경
         for code in style_codes:
-            # [수정] 품번 정확 일치 검색
             products = Product.query.filter_by(
                 brand_id=current_user.current_brand_id,
                 product_number=code
             ).all()
             for p in products:
                 p.image_status = 'PROCESSING'
+                p.last_message = '작업 시작됨...'
         db.session.commit()
 
         # 2. 비동기 작업 시작
@@ -124,6 +128,38 @@ def trigger_image_process():
             'message': '이미지 처리가 시작되었습니다.', 
             'task_id': task_id
         })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@api_bp.route('/api/product/images/reset', methods=['POST'])
+@login_required
+def reset_image_process_status():
+    """선택한 품번의 작업을 강제 초기화 (진행중 멈춤 해결용)"""
+    if not current_user.brand_id:
+         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
+
+    data = request.json
+    style_codes = data.get('style_codes', [])
+
+    if not style_codes:
+        return jsonify({'status': 'error', 'message': '선택된 품번이 없습니다.'}), 400
+
+    try:
+        count = 0
+        for code in style_codes:
+            products = Product.query.filter_by(
+                brand_id=current_user.current_brand_id,
+                product_number=code
+            ).all()
+            for p in products:
+                p.image_status = 'READY'
+                p.last_message = '사용자에 의해 초기화됨'
+                count += 1
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'message': f'{len(style_codes)}개 품번({count}개 상품)의 상태를 초기화했습니다.'})
 
     except Exception as e:
         db.session.rollback()
