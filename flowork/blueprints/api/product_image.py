@@ -15,14 +15,11 @@ def get_product_image_status():
         return jsonify({'status': 'error', 'message': '브랜드 계정이 필요합니다.'}), 403
 
     try:
-        # 1. 파라미터 수신 (페이지네이션 및 필터)
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 50, type=int)
-        tab_type = request.args.get('tab', 'all') # processing, failed, completed, all
+        tab_type = request.args.get('tab', 'all')
         search_query = request.args.get('query', '').strip()
 
-        # 2. 기본 쿼리 구성 (Product + Variant 조인하여 컬러 수 계산)
-        # SQL Group By를 사용하여 사이즈 중복을 DB단에서 제거하고 컬러 수만 셉니다.
         query = db.session.query(
             Product.product_number,
             Product.product_name,
@@ -36,11 +33,10 @@ def get_product_image_status():
          .filter(Product.brand_id == current_user.current_brand_id)\
          .group_by(Product.id)
 
-        # 3. 탭별 필터링 적용
         if tab_type == 'processing':
-            # 진행중 또는 대기 상태
+            query = query.filter(Product.image_status == 'PROCESSING')
+        elif tab_type == 'ready':
             query = query.filter(or_(
-                Product.image_status == 'PROCESSING',
                 Product.image_status == 'READY',
                 Product.image_status == None
             ))
@@ -49,7 +45,6 @@ def get_product_image_status():
         elif tab_type == 'completed':
             query = query.filter(Product.image_status == 'COMPLETED')
         
-        # 4. 검색 필터링 (품번 또는 품명)
         if search_query:
             search_term = f"%{search_query.upper()}%"
             query = query.filter(or_(
@@ -57,8 +52,6 @@ def get_product_image_status():
                 Product.product_name.ilike(search_term)
             ))
 
-        # 5. 정렬 및 페이지네이션 (DB에서 자름)
-        # 우선순위: 진행중/실패가 상단, 나머지는 품번순
         pagination = query.order_by(
             case(
                 (Product.image_status == 'PROCESSING', 1),
@@ -68,10 +61,8 @@ def get_product_image_status():
             Product.product_number.asc()
         ).paginate(page=page, per_page=limit, error_out=False)
 
-        # 6. 결과 변환
         result_list = []
         for row in pagination.items:
-            # row는 튜플 형태: (product_number, product_name, ..., total_colors)
             item = {
                 'style_code': row.product_number,
                 'product_name': row.product_name,
@@ -80,7 +71,7 @@ def get_product_image_status():
                 'detail': row.detail_image_url,
                 'drive_link': row.image_drive_link,
                 'message': row.last_message,
-                'total_colors': row.total_colors # DB에서 계산된 컬러 수
+                'total_colors': row.total_colors
             }
             result_list.append(item)
 
