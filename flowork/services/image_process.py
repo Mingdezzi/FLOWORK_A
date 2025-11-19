@@ -10,14 +10,22 @@ from flask import current_app
 from flowork.extensions import db
 from flowork.models import Product, Setting, Brand
 from flowork.services.drive import get_drive_service, get_or_create_folder, upload_file_to_drive
+from rembg import remove, new_session
 
 RESAMPLE_LANCZOS = Image.Resampling.LANCZOS
 
+_REMBG_SESSION = None
+
+def _get_rembg_session():
+    global _REMBG_SESSION
+    if _REMBG_SESSION is None:
+        model_name = "u2netp"
+        _REMBG_SESSION = new_session(model_name)
+    return _REMBG_SESSION
+
 def process_style_code_group(brand_id, style_code):
-    """품번 그룹별 이미지 처리 메인 로직"""
     products = []
     try:
-        # 0. 상품 조회
         products = Product.query.filter_by(brand_id=brand_id).filter(
             Product.product_number.like(f"{style_code}%")
         ).all()
@@ -25,10 +33,9 @@ def process_style_code_group(brand_id, style_code):
         if not products:
             return False, "해당 품번의 상품이 없습니다."
 
-        # 1. 구글 드라이브 설정 로드 및 연결
         drive_settings = _get_google_drive_settings(brand_id)
         if not drive_settings:
-            msg = "구글 드라이브 설정을 찾을 수 없습니다. (DB 또는 JSON 파일 확인 필요)"
+            msg = "구글 드라이브 설정을 찾을 수 없습니다."
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
@@ -44,10 +51,8 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        # 2. 컬러별 옵션 그룹화
         variants_map = {}
         for p in products:
-            # DB의 Variant 테이블에서 컬러 정보를 조회
             color_name = "UnknownColor"
             if p.variants and len(p.variants) > 0:
                 color_name = p.variants[0].color or "UnknownColor"
@@ -68,11 +73,9 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        # 3. 임시 폴더 생성
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_images', style_code)
         os.makedirs(temp_dir, exist_ok=True)
 
-        # 4. 이미지 다운로드 (비동기)
         patterns_config = _get_brand_url_patterns(brand_id)
         if not patterns_config:
              msg = "이미지 다운로드 URL 패턴 설정이 없습니다."
@@ -81,10 +84,8 @@ def process_style_code_group(brand_id, style_code):
 
         asyncio.run(_download_all_variants(style_code, variants_map, patterns_config, temp_dir))
 
-        # 5. 배경 제거
         valid_variants = []
         for color_name, data in variants_map.items():
-            # DF 이미지가 있으면 배경제거 시도
             if data['files']['DF']:
                 rep_image_path = data['files']['DF'][0]
                 nobg_path = _remove_background(rep_image_path)
@@ -92,20 +93,17 @@ def process_style_code_group(brand_id, style_code):
                     data['files']['NOBG'] = nobg_path
                     valid_variants.append(data)
             
-            # 모델컷(DM)만 있는 경우도 유효한 데이터로 간주 (썸네일엔 못 쓰더라도 드라이브엔 올림)
             elif data['files']['DM']:
                  valid_variants.append(data)
 
         if not valid_variants:
-            msg = "유효한 이미지를 하나도 다운로드하지 못했습니다. (URL 패턴 또는 품번 확인)"
+            msg = "유효한 이미지를 하나도 다운로드하지 못했습니다."
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        # 6. 썸네일 및 상세 이미지 생성
         thumbnail_path = _create_thumbnail(valid_variants, temp_dir, style_code)
         detail_path = _create_detail_image(valid_variants, temp_dir, style_code)
 
-        # 7. 구글 드라이브 업로드
         try:
             result_links = _upload_structure_to_drive(
                 drive_service, drive_settings, style_code, variants_map, thumbnail_path, detail_path
@@ -115,7 +113,6 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        # 8. 성공 처리 (DB 업데이트)
         _update_product_db(products, result_links)
         
         return True, f"성공: {len(valid_variants)}개 컬러 처리 완료"
@@ -159,7 +156,6 @@ def _update_product_db(products, links):
         db.session.rollback()
 
 def _load_brand_config_from_file(brand_id):
-    """브랜드 JSON 파일 직접 로드 (DB 설정 없을 때 Fallback)"""
     try:
         brand = db.session.get(Brand, brand_id)
         if not brand: return None
@@ -173,7 +169,6 @@ def _load_brand_config_from_file(brand_id):
     return None
 
 def _get_brand_url_patterns(brand_id):
-    # 1. DB 확인
     setting = Setting.query.filter_by(brand_id=brand_id, key='IMAGE_DOWNLOAD_PATTERNS').first()
     if setting and setting.value:
         try:
@@ -181,7 +176,6 @@ def _get_brand_url_patterns(brand_id):
         except:
             pass
             
-    # 2. 파일 확인 (Fallback)
     config = _load_brand_config_from_file(brand_id)
     if config:
         return config.get('IMAGE_DOWNLOAD_PATTERNS', {})
@@ -189,7 +183,6 @@ def _get_brand_url_patterns(brand_id):
     return {}
 
 def _get_google_drive_settings(brand_id):
-    # 1. DB 확인
     setting = Setting.query.filter_by(brand_id=brand_id, key='GOOGLE_DRIVE_SETTINGS').first()
     if setting and setting.value:
         try:
@@ -197,7 +190,6 @@ def _get_google_drive_settings(brand_id):
         except:
             pass
             
-    # 2. 파일 확인 (Fallback)
     config = _load_brand_config_from_file(brand_id)
     if config:
         return config.get('GOOGLE_DRIVE_SETTINGS', {})
@@ -209,19 +201,14 @@ async def _download_all_variants(style_code, variants_map, patterns_config, save
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = []
         
-        # 연도 추론 (JUP24... -> 24 -> 2024)
         year = ""
         if len(style_code) >= 5 and style_code[3:5].isdigit():
             year = "20" + style_code[3:5]
 
         for color_name, data in variants_map.items():
-            # [수정] URL 생성용 코드 = 품번(StyleCode) + 컬러(Color)
-            # 예: JUP24301 + NA -> JUP24301NA
-            
             p_num = data['product'].product_number
             c_code = color_name.strip() if color_name and color_name != "UnknownColor" else ""
             
-            # 품번과 컬러를 합쳐서 완전한 코드를 만듦
             full_code = f"{p_num}{c_code}"
             
             color_dir = os.path.join(save_dir, color_name)
@@ -245,7 +232,6 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
     while True:
         found_any_pattern = False
         
-        # 01, 1, 001 등 다양한 번호 포맷 시도
         num_formats = [f"{num:02d}", f"{num}", f"{num:03d}"]
         
         for num_fmt in num_formats: 
@@ -277,16 +263,12 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
             num += 1
             consecutive_failures = 0
         else:
-            # 연속 실패 시 중단
             consecutive_failures += 1
             if consecutive_failures >= 1: 
                 break
 
 def _remove_background(input_path):
     try:
-        # Lazy Import
-        from rembg import remove
-        
         name, ext = os.path.splitext(input_path)
         output_path = f"{name}_nobg.png"
         
@@ -294,10 +276,12 @@ def _remove_background(input_path):
         os.environ['U2NET_HOME'] = model_home
         os.makedirs(model_home, exist_ok=True)
 
+        session = _get_rembg_session()
+
         with open(input_path, 'rb') as i:
             with open(output_path, 'wb') as o:
                 input_data = i.read()
-                output_data = remove(input_data)
+                output_data = remove(input_data, session=session)
                 o.write(output_data)
         return output_path
     except Exception as e:
@@ -409,12 +393,10 @@ def _create_detail_image(variants, temp_dir, style_code):
 def _upload_structure_to_drive(service, settings, style_code, variants_map, thumb_path, detail_path):
     root_id = settings.get('TARGET_FOLDER_ID')
     
-    # 1. 품번 폴더 생성
     product_folder_id = get_or_create_folder(service, style_code, root_id)
     
     result = {'drive_folders': {}, 'thumbnail': None, 'detail': None}
 
-    # 2. 썸네일/상세 폴더 및 파일 업로드
     if thumb_path:
         thumb_folder_id = get_or_create_folder(service, 'THUMBNAIL', product_folder_id)
         link = upload_file_to_drive(service, thumb_path, f"{style_code}_thumb.png", thumb_folder_id)
@@ -425,7 +407,6 @@ def _upload_structure_to_drive(service, settings, style_code, variants_map, thum
         link = upload_file_to_drive(service, detail_path, f"{style_code}_detail.png", detail_folder_id)
         result['detail'] = link
 
-    # 3. 컬러별 폴더 및 이미지 업로드
     for color_name, data in variants_map.items():
         color_folder_id = get_or_create_folder(service, color_name, product_folder_id)
         result['drive_folders'][color_name] = f"https://drive.google.com/drive/folders/{color_folder_id}"
