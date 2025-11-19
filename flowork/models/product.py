@@ -21,6 +21,11 @@ class Product(db.Model):
     product_number_cleaned = db.Column(db.String, index=True)
     product_name_cleaned = db.Column(db.String, index=True)
     product_name_choseong = db.Column(db.String, index=True) 
+
+    image_status = db.Column(db.String(20), default='READY', nullable=False)
+    image_drive_link = db.Column(db.String(500), nullable=True)
+    thumbnail_url = db.Column(db.String(500), nullable=True)
+    detail_image_url = db.Column(db.String(500), nullable=True)
     
     variants = db.relationship('Variant', back_populates='product', cascade="all, delete-orphan")
     orders = db.relationship('Order', backref='product_ref', lazy='dynamic')
