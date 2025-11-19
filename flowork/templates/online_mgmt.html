@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .status-badge { font-size: 0.85rem; width: 80px; cursor: help; }
+        .status-badge.bg-danger { cursor: pointer; }
         .img-preview { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #dee2e6; }
         .img-placeholder { width: 40px; height: 40px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; color: #adb5bd; }
         .nav-tabs .nav-link { cursor: pointer; }
@@ -319,7 +320,10 @@
                     else if (item.status === 'COMPLETED') { badgeClass = 'bg-success'; statusLabel = '완료'; }
                     else if (item.status === 'FAILED') { badgeClass = 'bg-danger'; statusLabel = '실패'; }
                     
-                    const titleAttr = item.message ? `title="${item.message}"` : '';
+                    const rawMessage = item.message || '';
+                    const safeMessage = rawMessage.replace(/"/g, '&quot;');
+                    const titleAttr = rawMessage ? `title="${safeMessage}"` : '';
+                    const dataMsgAttr = rawMessage ? `data-message="${safeMessage}"` : '';
                     
                     const thumbHtml = item.thumbnail ? `<a href="${item.thumbnail}" target="_blank"><img src="${item.thumbnail}" class="img-preview"></a>` : `<div class="img-placeholder"><i class="bi bi-image"></i></div>`;
                     const detailLink = item.detail ? `<a href="${item.detail}" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-file-earmark-image"></i></a>` : `-`;
@@ -336,7 +340,7 @@
                         <td>-</td>
                         <td>${thumbHtml}</td>
                         <td>${detailLink}</td>
-                        <td><span class="badge ${badgeClass} status-badge" ${titleAttr}>${statusLabel}</span></td>
+                        <td><span class="badge ${badgeClass} status-badge" ${titleAttr} ${dataMsgAttr}>${statusLabel}</span></td>
                         <td><button class="btn btn-sm btn-outline-dark"><i class="bi bi-download"></i></button></td>
                     `;
                     tbody.appendChild(tr);
@@ -404,6 +408,32 @@
             document.body.addEventListener('change', (e) => {
                 if (e.target.classList.contains('item-check')) {
                     updateButtons();
+                }
+            });
+
+            document.body.addEventListener('click', (e) => {
+                if (e.target.classList.contains('status-badge') && e.target.classList.contains('bg-danger')) {
+                    const message = e.target.dataset.message;
+                    if (message) {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(message).then(() => alert("오류 로그가 복사되었습니다:\n" + message)).catch(err => alert("복사 실패: " + err));
+                        } else {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = message;
+                            textArea.style.position = "fixed";
+                            textArea.style.left = "-9999px";
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            try {
+                                document.execCommand('copy');
+                                alert("오류 로그가 복사되었습니다:\n" + message);
+                            } catch (err) {
+                                alert("복사하기 실패 (보안 제한): " + message);
+                            }
+                            document.body.removeChild(textArea);
+                        }
+                    }
                 }
             });
 
