@@ -5,7 +5,8 @@ import io
 import random
 import traceback
 from PIL import Image, ImageDraw, ImageFont
-from rembg import remove
+# [수정] 상단 import 제거 (Lazy Import 적용)
+# from rembg import remove 
 from flask import current_app
 from flowork.extensions import db
 from flowork.models import Product, Setting
@@ -16,7 +17,6 @@ RESAMPLE_LANCZOS = Image.Resampling.LANCZOS
 def process_style_code_group(brand_id, style_code):
     products = []
     try:
-        # 0. 상품 조회 (입력받은 품번과 정확히 일치하거나 시작하는 상품)
         products = Product.query.filter_by(brand_id=brand_id).filter(
             Product.product_number.like(f"{style_code}%")
         ).all()
@@ -29,20 +29,21 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED')
             return False, "Google Drive 연결 실패 (인증 파일 확인 필요)"
 
-        # 1. DB에서 컬러 정보 가져와서 그룹화
         variants_map = {}
         for p in products:
+            color_code = ""
+            if len(p.product_number) >= len(style_code) + 2:
+                color_code = p.product_number[len(style_code):len(style_code)+2]
+            
             # DB의 Variant 테이블에서 컬러 정보를 조회
-            # (상품 하나에 여러 옵션이 있어도 첫 번째 옵션의 컬러를 대표 컬러로 사용)
             color_name = "UnknownColor"
             if p.variants and len(p.variants) > 0:
                 color_name = p.variants[0].color or "UnknownColor"
             
-            # 유효한 컬러명이면 맵에 추가
             if color_name not in variants_map:
                 variants_map[color_name] = {
                     'product': p,
-                    'color_code': color_name,  # 폴더명 등으로 사용됨
+                    'color_code': color_name,
                     'files': {
                         'DF': [], 
                         'DM': [], 
@@ -52,46 +53,36 @@ def process_style_code_group(brand_id, style_code):
 
         if not variants_map:
             _update_product_status(products, 'FAILED')
-            return False, "상품에 연결된 컬러 옵션(Variant)을 찾을 수 없습니다."
+            return False, "처리할 컬러 옵션을 찾을 수 없습니다."
 
-        # 2. 임시 폴더 생성
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_images', style_code)
         os.makedirs(temp_dir, exist_ok=True)
 
         patterns_config = _get_brand_url_patterns(brand_id)
         
-        # 3. 이미지 다운로드 (비동기)
         asyncio.run(_download_all_variants(style_code, variants_map, patterns_config, temp_dir))
 
-        # 4. 배경 제거 (대표 이미지 1장)
         valid_variants = []
         for color_name, data in variants_map.items():
             if data['files']['DF']:
                 rep_image_path = data['files']['DF'][0]
+                # 배경 제거 함수 호출
                 nobg_path = _remove_background(rep_image_path)
                 if nobg_path:
                     data['files']['NOBG'] = nobg_path
                     valid_variants.append(data)
-            
-            # DF는 없지만 DM만 있는 경우도 유효한 데이터로 칠지 결정 (일단은 DF필수 로직 유지)
-            elif data['files']['DM']: 
-                 # 모델컷만 있으면 누끼를 모델컷으로 시도하거나 스킵
-                 pass
 
         if not valid_variants:
             _update_product_status(products, 'FAILED')
-            return False, "이미지 다운로드 실패 (가능한 URL 패턴이 없거나 파일 없음)"
+            return False, "이미지 다운로드 실패 또는 배경 제거 실패"
 
-        # 5. 합성 이미지 생성
         thumbnail_path = _create_thumbnail(valid_variants, temp_dir, style_code)
         detail_path = _create_detail_image(valid_variants, temp_dir, style_code)
 
-        # 6. 구글 드라이브 업로드
         result_links = _upload_structure_to_drive(
             drive_service, brand_id, style_code, variants_map, thumbnail_path, detail_path
         )
 
-        # 7. DB 업데이트
         _update_product_db(products, result_links)
         
         return True, f"성공: {len(valid_variants)}개 컬러 처리 완료"
@@ -197,10 +188,9 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
                         if response.status == 200:
                             content = await response.read()
                             
-                            # 확장자 결정
                             ext = ".jpg"
                             if url.lower().endswith(".png"): ext = ".png"
-                            elif url.endswith(".JPG"): ext = ".JPG" # 대문자 유지
+                            elif url.endswith(".JPG"): ext = ".JPG"
                             
                             filename = f"{code}_{img_type}_{num_fmt}{ext}"
                             save_path = os.path.join(save_dir, filename)
@@ -208,7 +198,6 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
                             with open(save_path, 'wb') as f:
                                 f.write(content)
                             
-                            # DG 타입은 DF/DM이 없을 때를 대비해 저장하되 우선순위 로직은 추후 반영
                             data_ref['files'][img_type].append(save_path)
                             found_any_pattern = True
                             break 
@@ -220,15 +209,25 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
             num += 1
             consecutive_failures = 0
         else:
-            # 연속 실패 시 중단 (이미지 끝)
             consecutive_failures += 1
             if consecutive_failures >= 1: 
                 break
 
 def _remove_background(input_path):
+    """배경 제거 함수 (Lazy Import 적용)"""
     try:
+        # [중요] 여기서 import하여 서버 부팅 속도를 높이고 메모리 이슈 방지
+        from rembg import remove
+        
         name, ext = os.path.splitext(input_path)
         output_path = f"{name}_nobg.png"
+        
+        # AI 모델 저장 경로 지정 (Render 등에서 권한 문제 방지)
+        # u2net 모델이 없으면 최초 1회 다운로드됨
+        model_home = os.path.join(current_app.config['UPLOAD_FOLDER'], 'models')
+        os.environ['U2NET_HOME'] = model_home
+        os.makedirs(model_home, exist_ok=True)
+
         with open(input_path, 'rb') as i:
             with open(output_path, 'wb') as o:
                 input_data = i.read()
@@ -292,7 +291,6 @@ def _get_grid_layout(count):
     if count == 2: return [(0.5, 0), (0.5, 1)]
     if count == 3: return [(0, 0.5), (1, 0), (1, 1)]
     
-    # 4개 이상일 때 2x2 배치
     layout = []
     for r in range(2):
         for c in range(2):
@@ -345,43 +343,32 @@ def _create_detail_image(variants, temp_dir, style_code):
 def _upload_structure_to_drive(service, brand_id, style_code, variants_map, thumb_path, detail_path):
     root_id = _get_brand_root_folder_id(brand_id)
     
-    # 품번 폴더 생성
     product_folder_id = get_or_create_folder(service, style_code, root_id)
-    
-    # 공통 파일 폴더 (선택사항, 여기서는 루트에 둠)
-    # 썸네일, 상세 이미지는 품번 폴더 바로 아래에 둡니다.
     
     result = {'drive_folders': {}, 'thumbnail': None, 'detail': None}
 
     if thumb_path:
-        # 품번/THUMBNAIL 폴더 생성
         thumb_folder_id = get_or_create_folder(service, 'THUMBNAIL', product_folder_id)
         link = upload_file_to_drive(service, thumb_path, f"{style_code}_thumb.png", thumb_folder_id)
         result['thumbnail'] = link
         
     if detail_path:
-        # 품번/DETAILCOLOR 폴더 생성
         detail_folder_id = get_or_create_folder(service, 'DETAILCOLOR', product_folder_id)
         link = upload_file_to_drive(service, detail_path, f"{style_code}_detail.png", detail_folder_id)
         result['detail'] = link
 
     for color_name, data in variants_map.items():
-        # 품번/컬러명 폴더 생성
         color_folder_id = get_or_create_folder(service, color_name, product_folder_id)
         result['drive_folders'][color_name] = f"https://drive.google.com/drive/folders/{color_folder_id}"
         
-        # 하위 폴더들: ORIGINAL, NOBG, MODEL
         original_folder_id = get_or_create_folder(service, 'ORIGINAL', color_folder_id)
         nobg_folder_id = get_or_create_folder(service, 'NOBG', color_folder_id)
         model_folder_id = get_or_create_folder(service, 'MODEL', color_folder_id)
 
-        # 파일 업로드
         for path in data['files']['DF']:
             upload_file_to_drive(service, path, os.path.basename(path), original_folder_id)
-        
-        # DG 파일도 ORIGINAL에 넣을지 말지 결정 (현재는 DF만)
+            
         for path in data['files']['DG']:
-             # DG 파일은 필요시 업로드
              pass 
 
         if data['files']['NOBG']:
