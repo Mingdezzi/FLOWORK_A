@@ -80,7 +80,7 @@
 
   "GOOGLE_DRIVE_SETTINGS": {
     "SERVICE_ACCOUNT_FILE": "EIDERGOOGLE.json",
-    "TARGET_FOLDER_ID": "", 
+    "TARGET_FOLDER_ID": "1iHU41B7OBbfFOeQhwEBr7dGj-mFE5Q1e", 
     "USE_SUBFOLDER": true,
     "UPLOAD_TYPES": ["original", "nobg", "thumbnail", "detail"],
     "SHARE_PERMISSION": "reader"
