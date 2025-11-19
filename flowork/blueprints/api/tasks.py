@@ -4,6 +4,7 @@ import traceback
 from flask import jsonify, current_app
 from . import api_bp
 from flowork.services.excel import process_stock_upsert_excel, import_excel_file
+from flowork.services.image_process import process_style_code_group
 
 TASKS = {}
 
@@ -59,6 +60,34 @@ def run_async_import_db(app, task_id, file_path, form_data, brand_id):
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
+
+def run_async_image_process(app, task_id, brand_id, style_codes):
+    with app.app_context():
+        try:
+            total = len(style_codes)
+            success_count = 0
+            results = []
+
+            for i, code in enumerate(style_codes):
+                update_task_status(task_id, i, total)
+                
+                success, msg = process_style_code_group(brand_id, code)
+                results.append({'code': code, 'success': success, 'message': msg})
+                if success:
+                    success_count += 1
+            
+            update_task_status(task_id, total, total)
+            TASKS[task_id]['status'] = 'completed'
+            TASKS[task_id]['result'] = {
+                'message': f"이미지 처리 완료: 성공 {success_count}/{total}건",
+                'details': results
+            }
+            
+        except Exception as e:
+            print(f"Async image process error: {e}")
+            traceback.print_exc()
+            TASKS[task_id]['status'] = 'error'
+            TASKS[task_id]['message'] = str(e)
 
 @api_bp.route('/api/task_status/<task_id>', methods=['GET'])
 def get_task_status(task_id):
