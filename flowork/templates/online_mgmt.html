@@ -10,6 +10,7 @@
         .status-badge { font-size: 0.85rem; width: 80px; }
         .img-preview { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #dee2e6; }
         .img-placeholder { width: 40px; height: 40px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; color: #adb5bd; }
+        .nav-tabs .nav-link { cursor: pointer; }
     </style>
 </head>
 <body data-api-list="{{ url_for('api.get_product_image_status') }}" 
@@ -21,38 +22,135 @@
 
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="section-title mb-0"><i class="bi bi-globe me-2"></i>온라인 품번 관리</h2>
-            <button class="btn btn-primary" id="btn-start-process" disabled>
-                <i class="bi bi-play-fill me-1"></i> 선택 항목 처리 시작
-            </button>
+            <div class="d-flex gap-2">
+                <span id="status-text" class="text-muted small align-self-center me-2">로딩 중...</span>
+                <button class="btn btn-primary" id="btn-start-process" disabled>
+                    <i class="bi bi-play-fill me-1"></i> 선택 항목 처리 시작
+                </button>
+            </div>
         </div>
 
         <div class="card">
-            <div class="card-header bg-light">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span id="status-text" class="text-muted small">데이터 로딩 중...</span>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="check-all">
-                        <label class="form-check-label" for="check-all">전체 선택</label>
-                    </div>
-                </div>
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="managementTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-processing-btn" data-bs-toggle="tab" data-bs-target="#tab-processing" type="button">
+                            <i class="bi bi-hourglass-split me-1"></i>진행중 <span class="badge bg-primary ms-1" id="count-processing">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-completed-btn" data-bs-toggle="tab" data-bs-target="#tab-completed" type="button">
+                            <i class="bi bi-check-circle me-1"></i>완료 <span class="badge bg-success ms-1" id="count-completed">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-all-btn" data-bs-toggle="tab" data-bs-target="#tab-all" type="button">
+                            <i class="bi bi-list me-1"></i>전체 <span class="badge bg-secondary ms-1" id="count-all">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-search-btn" data-bs-toggle="tab" data-bs-target="#tab-search" type="button">
+                            <i class="bi bi-search me-1"></i>상세검색
+                        </button>
+                    </li>
+                </ul>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 text-center">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 50px;">선택</th>
-                            <th>품번 (Style Code)</th>
-                            <th>대표 상품명</th>
-                            <th>컬러 수</th>
-                            <th>썸네일</th>
-                            <th>상세이미지</th>
-                            <th>상태</th>
-                        </tr>
-                    </thead>
-                    <tbody id="image-list-body">
-                        <tr><td colspan="7" class="p-5 text-muted">로딩 중...</td></tr>
-                    </tbody>
-                </table>
+            
+            <div class="card-body p-0">
+                <div class="tab-content" id="managementTabsContent">
+                    
+                    <div class="tab-pane fade show active" id="tab-processing" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;"><input type="checkbox" class="form-check-input check-all-tab" data-target="tbody-processing"></th>
+                                        <th>품번</th>
+                                        <th>상품명</th>
+                                        <th>컬러수</th>
+                                        <th>썸네일</th>
+                                        <th>상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-processing"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-completed" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;"><input type="checkbox" class="form-check-input check-all-tab" data-target="tbody-completed"></th>
+                                        <th>품번</th>
+                                        <th>상품명</th>
+                                        <th>컬러수</th>
+                                        <th>썸네일</th>
+                                        <th>상세이미지</th>
+                                        <th>드라이브</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-completed"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-all" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;"><input type="checkbox" class="form-check-input check-all-tab" data-target="tbody-all"></th>
+                                        <th>품번</th>
+                                        <th>상품명</th>
+                                        <th>컬러수</th>
+                                        <th>썸네일</th>
+                                        <th>상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-all"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-search" role="tabpanel">
+                        <div class="p-3 bg-light border-bottom">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" id="search-query" placeholder="품번 또는 상품명 검색...">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select" id="search-status">
+                                        <option value="">모든 상태</option>
+                                        <option value="READY">대기</option>
+                                        <option value="PROCESSING">진행중</option>
+                                        <option value="COMPLETED">완료</option>
+                                        <option value="FAILED">실패</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;"><input type="checkbox" class="form-check-input check-all-tab" data-target="tbody-search"></th>
+                                        <th>품번</th>
+                                        <th>상품명</th>
+                                        <th>컬러수</th>
+                                        <th>썸네일</th>
+                                        <th>상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-search">
+                                    <tr><td colspan="6" class="p-4 text-muted">검색어를 입력하세요.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
     </div>
@@ -61,9 +159,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const listBody = document.getElementById('image-list-body');
             const btnStart = document.getElementById('btn-start-process');
-            const checkAll = document.getElementById('check-all');
             const statusText = document.getElementById('status-text');
             
             const API_LIST = document.body.dataset.apiList;
@@ -73,7 +169,7 @@
             let isProcessing = false;
 
             async function loadData() {
-                if (isProcessing) return; 
+                if (isProcessing) return;
 
                 try {
                     const res = await fetch(API_LIST);
@@ -81,29 +177,47 @@
                     
                     if (json.status === 'success') {
                         itemsCache = json.data;
-                        renderTable(itemsCache);
-                        updateStatusText();
+                        renderAllTabs();
+                        updateGlobalStatus();
                     }
                 } catch (e) {
                     console.error("Load error:", e);
+                    statusText.textContent = "데이터 로드 실패";
                 }
             }
 
-            function renderTable(items) {
-                const checkedIds = new Set(
-                    Array.from(document.querySelectorAll('.item-check:checked')).map(cb => cb.value)
+            function renderAllTabs() {
+                const processingItems = itemsCache.filter(i => i.status === 'PROCESSING');
+                const completedItems = itemsCache.filter(i => i.status === 'COMPLETED');
+                
+                renderTable('tbody-processing', processingItems);
+                renderTable('tbody-completed', completedItems);
+                renderTable('tbody-all', itemsCache);
+                
+                // 검색 탭은 검색어가 있을 때만 갱신
+                const query = document.getElementById('search-query').value.trim();
+                if (query) filterSearch();
+
+                document.getElementById('count-processing').textContent = processingItems.length;
+                document.getElementById('count-completed').textContent = completedItems.length;
+                document.getElementById('count-all').textContent = itemsCache.length;
+            }
+
+            function renderTable(tbodyId, items) {
+                const tbody = document.getElementById(tbodyId);
+                const checkedSet = new Set(
+                    Array.from(tbody.querySelectorAll('.item-check:checked')).map(cb => cb.value)
                 );
 
-                listBody.innerHTML = '';
-                
+                tbody.innerHTML = '';
                 if (items.length === 0) {
-                    listBody.innerHTML = '<tr><td colspan="7" class="p-5 text-muted">등록된 상품이 없습니다.</td></tr>';
+                    const colSpan = (tbodyId === 'tbody-completed') ? 7 : 6;
+                    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="p-4 text-muted">데이터가 없습니다.</td></tr>`;
                     return;
                 }
 
                 items.forEach(item => {
                     const tr = document.createElement('tr');
-                    const isChecked = checkedIds.has(item.style_code);
                     
                     let badgeClass = 'bg-secondary';
                     let statusLabel = '대기';
@@ -115,64 +229,105 @@
                         ? `<a href="${item.thumbnail}" target="_blank"><img src="${item.thumbnail}" class="img-preview"></a>`
                         : `<div class="img-placeholder"><i class="bi bi-image"></i></div>`;
                         
-                    const detailHtml = item.detail 
-                        ? `<a href="${item.detail}" target="_blank"><i class="bi bi-file-earmark-image fs-4 text-primary"></i></a>`
-                        : `<span class="text-muted">-</span>`;
+                    const detailLink = item.detail 
+                        ? `<a href="${item.detail}" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-file-earmark-image"></i></a>`
+                        : `-`;
 
                     const disabled = item.status === 'PROCESSING' ? 'disabled' : '';
+                    const isChecked = checkedSet.has(item.style_code);
+
+                    let extraCells = '';
+                    if (tbodyId === 'tbody-completed') {
+                         extraCells = `<td>${detailLink}</td><td><i class="bi bi-google text-success"></i></td>`;
+                    } else {
+                         extraCells = `<td><span class="badge ${badgeClass} status-badge">${statusLabel}</span></td>`;
+                    }
 
                     tr.innerHTML = `
-                        <td>
-                            <input type="checkbox" class="form-check-input item-check" 
-                                   value="${item.style_code}" ${isChecked ? 'checked' : ''} ${disabled}>
-                        </td>
+                        <td><input type="checkbox" class="form-check-input item-check" value="${item.style_code}" ${isChecked ? 'checked' : ''} ${disabled}></td>
                         <td class="fw-bold">${item.style_code}</td>
-                        <td class="text-start">${item.product_name}</td>
+                        <td class="text-start text-truncate" style="max-width: 200px;">${item.product_name}</td>
                         <td>${item.total_colors}</td>
                         <td>${thumbHtml}</td>
-                        <td>${detailHtml}</td>
-                        <td><span class="badge ${badgeClass} status-badge">${statusLabel}</span></td>
+                        ${extraCells}
                     `;
-                    listBody.appendChild(tr);
+                    tbody.appendChild(tr);
                 });
-                
                 updateStartButton();
             }
 
-            checkAll.addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                document.querySelectorAll('.item-check:not(:disabled)').forEach(cb => {
-                    cb.checked = isChecked;
+            // 검색 필터링
+            const searchInput = document.getElementById('search-query');
+            const searchStatus = document.getElementById('search-status');
+            
+            function filterSearch() {
+                const query = searchInput.value.toLowerCase().trim();
+                const status = searchStatus.value;
+                
+                if (!query && !status) {
+                    renderTable('tbody-search', []);
+                    return;
+                }
+
+                const filtered = itemsCache.filter(item => {
+                    const matchQuery = item.style_code.toLowerCase().includes(query) || item.product_name.toLowerCase().includes(query);
+                    const matchStatus = !status || item.status === status;
+                    return matchQuery && matchStatus;
                 });
-                updateStartButton();
+                renderTable('tbody-search', filtered);
+            }
+
+            searchInput.addEventListener('input', filterSearch);
+            searchStatus.addEventListener('change', filterSearch);
+
+            // 전체 선택 (탭별)
+            document.querySelectorAll('.check-all-tab').forEach(checkAll => {
+                checkAll.addEventListener('change', (e) => {
+                    const targetId = e.target.dataset.target;
+                    const isChecked = e.target.checked;
+                    const tbody = document.getElementById(targetId);
+                    tbody.querySelectorAll('.item-check:not(:disabled)').forEach(cb => {
+                        cb.checked = isChecked;
+                    });
+                    updateStartButton();
+                });
             });
 
-            listBody.addEventListener('change', (e) => {
+            // 개별 선택 감지
+            document.body.addEventListener('change', (e) => {
                 if (e.target.classList.contains('item-check')) {
                     updateStartButton();
                 }
             });
 
             function updateStartButton() {
-                const count = document.querySelectorAll('.item-check:checked').length;
+                // 현재 활성화된 탭의 체크박스만 계산 (또는 전체 탭 합산)
+                // 여기서는 전체 DOM에서 체크된 항목을 수집 (중복 제거)
+                const allChecked = document.querySelectorAll('.item-check:checked');
+                const uniqueCodes = new Set(Array.from(allChecked).map(cb => cb.value));
+                const count = uniqueCodes.size;
+
                 btnStart.disabled = count === 0;
                 btnStart.innerHTML = count > 0 
                     ? `<i class="bi bi-play-fill me-1"></i> ${count}건 처리 시작`
                     : `<i class="bi bi-play-fill me-1"></i> 선택 항목 처리 시작`;
             }
-            
-            function updateStatusText() {
-                const total = itemsCache.length;
-                const completed = itemsCache.filter(i => i.status === 'COMPLETED').length;
+
+            function updateGlobalStatus() {
                 const processing = itemsCache.filter(i => i.status === 'PROCESSING').length;
-                statusText.innerHTML = `총 <b>${total}</b>건 (완료: ${completed}, 진행중: ${processing})`;
+                if (processing > 0) {
+                    statusText.innerHTML = `<span class="spinner-border spinner-border-sm text-primary me-1"></span> ${processing}건 처리 중...`;
+                } else {
+                    statusText.textContent = `최신 상태 (총 ${itemsCache.length}건)`;
+                }
             }
 
             btnStart.addEventListener('click', async () => {
-                const selectedCodes = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => cb.value);
+                const allChecked = document.querySelectorAll('.item-check:checked');
+                const selectedCodes = Array.from(new Set(Array.from(allChecked).map(cb => cb.value)));
+                
                 if (selectedCodes.length === 0) return;
-
-                if (!confirm(`선택한 ${selectedCodes.length}개 품번의 이미지 작업을 시작하시겠습니까?\n(시간이 소요될 수 있습니다)`)) return;
+                if (!confirm(`${selectedCodes.length}개 품번의 이미지 작업을 시작하시겠습니까?`)) return;
 
                 isProcessing = true;
                 btnStart.disabled = true;
@@ -187,25 +342,23 @@
                         },
                         body: JSON.stringify({ style_codes: selectedCodes })
                     });
-                    
                     const json = await res.json();
                     if (json.status === 'success') {
                         alert(json.message);
+                        isProcessing = false;
                         loadData(); 
                     } else {
                         alert('오류: ' + json.message);
+                        isProcessing = false;
                     }
                 } catch (e) {
-                    alert('통신 오류 발생');
-                    console.error(e);
-                } finally {
+                    alert('통신 오류');
                     isProcessing = false;
-                    checkAll.checked = false; 
                 }
             });
 
             loadData();
-            setInterval(loadData, 5000); 
+            setInterval(loadData, 5000);
         });
     </script>
 </body>
