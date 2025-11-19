@@ -27,6 +27,9 @@ class Product(db.Model):
     thumbnail_url = db.Column(db.String(500), nullable=True)
     detail_image_url = db.Column(db.String(500), nullable=True)
     
+    # [추가] 작업 결과 메시지 또는 에러 로그 저장
+    last_message = db.Column(db.Text, nullable=True)
+    
     variants = db.relationship('Variant', back_populates='product', cascade="all, delete-orphan")
     orders = db.relationship('Order', backref='product_ref', lazy='dynamic')
 
