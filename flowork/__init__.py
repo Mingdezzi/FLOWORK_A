@@ -1,31 +1,19 @@
 import os
 from flask import Flask
-from sqlalchemy import text
-from apscheduler.schedulers.background import BackgroundScheduler
 from flask_wtf.csrf import CSRFProtect
-
 from .extensions import db, login_manager
-from .models import User 
-# [수정] update_db_command 추가 임포트
+from .models import User
 from .commands import init_db_command, update_db_command
 
 csrf = CSRFProtect()
 
-login_manager.login_view = 'auth.login' 
+login_manager.login_view = 'auth.login'
 login_manager.login_message = '로그인이 필요합니다.'
 login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id)) 
-
-def keep_db_awake(app):
-    try:
-        with app.app_context():
-            db.session.execute(text('SELECT 1'))
-            print("Neon DB keep-awake (from scheduler).")
-    except Exception as e:
-        print(f"Keep-awake scheduler error: {e}")
+    return db.session.get(User, int(user_id))
 
 def create_app(config_class):
     app = Flask(__name__,
@@ -42,24 +30,15 @@ def create_app(config_class):
 
     # 2. CLI 명령어 등록
     app.cli.add_command(init_db_command)
-    app.cli.add_command(update_db_command) # [추가] 명령어 등록
+    app.cli.add_command(update_db_command)
 
     # 3. 블루프린트 등록
-    from .blueprints.ui import ui_bp 
+    from .blueprints.ui import ui_bp
     from .blueprints.api import api_bp
-    from .blueprints.auth import auth_bp 
+    from .blueprints.auth import auth_bp
     
     app.register_blueprint(ui_bp)
     app.register_blueprint(api_bp)
-    app.register_blueprint(auth_bp) 
-    
-    # 4. 스케줄러 설정
-    if os.environ.get('RENDER'):
-        scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(lambda: keep_db_awake(app), 'interval', minutes=3)
-        scheduler.start()
-        print("APScheduler started (Render environment).")
-    else:
-        print("APScheduler skipped (Not in RENDER environment).")
+    app.register_blueprint(auth_bp)
     
     return app
