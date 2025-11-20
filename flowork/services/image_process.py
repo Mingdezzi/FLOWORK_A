@@ -5,6 +5,7 @@ import shutil
 import random
 import traceback
 import json
+import statistics
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 from flask import current_app
@@ -202,6 +203,8 @@ async def _download_all_variants(style_code, variants_map, patterns_config, save
 async def _download_sequence(session, code, year, patterns, save_dir, img_type, data_ref):
     num = 1
     consecutive_failures = 0
+    MAX_FAILURES = 5 
+
     while True:
         found_any_pattern = False
         num_formats = [f"{num:02d}", f"{num}", f"{num:03d}"]
@@ -228,13 +231,15 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
                 except:
                     continue
             if found_any_pattern: break
+        
         if found_any_pattern:
             num += 1
             consecutive_failures = 0
         else:
             consecutive_failures += 1
-            if consecutive_failures >= 1: 
+            if consecutive_failures >= MAX_FAILURES: 
                 break
+            num += 1
 
 def _remove_background(input_path):
     try:
@@ -436,20 +441,26 @@ def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, de
     for color_name, data in variants_map.items():
         color_base_dir = os.path.join(product_base_dir, color_name)
         original_dir = os.path.join(color_base_dir, 'ORIGINAL')
+        model_dir = os.path.join(color_base_dir, 'MODEL')
         nobg_dir = os.path.join(color_base_dir, 'NOBG')
         
-        os.makedirs(original_dir, exist_ok=True)
-        os.makedirs(nobg_dir, exist_ok=True)
+        # DF -> ORIGINAL
+        if data['files']['DF']:
+            os.makedirs(original_dir, exist_ok=True)
+            for path in data['files']['DF']:
+                filename = os.path.basename(path)
+                shutil.copy2(path, os.path.join(original_dir, filename))
         
-        for path in data['files']['DF']:
-            filename = os.path.basename(path)
-            shutil.copy2(path, os.path.join(original_dir, filename))
+        # DM -> MODEL
+        if data['files']['DM']:
+            os.makedirs(model_dir, exist_ok=True)
+            for path in data['files']['DM']:
+                filename = os.path.basename(path)
+                shutil.copy2(path, os.path.join(model_dir, filename))
             
-        for path in data['files']['DM']:
-            filename = os.path.basename(path)
-            shutil.copy2(path, os.path.join(original_dir, filename))
-            
+        # NOBG -> NOBG
         if data['files']['NOBG'] and os.path.exists(data['files']['NOBG']):
+            os.makedirs(nobg_dir, exist_ok=True)
             filename = os.path.basename(data['files']['NOBG'])
             shutil.copy2(data['files']['NOBG'], os.path.join(nobg_dir, filename))
 
