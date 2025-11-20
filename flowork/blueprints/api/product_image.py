@@ -1,7 +1,11 @@
 import uuid
 import threading
 import traceback
-from flask import request, jsonify, current_app
+import os
+import io
+import shutil
+import zipfile
+from flask import request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from sqlalchemy import text, func, or_, case
 from flowork.models import db, Product, Variant
@@ -196,6 +200,87 @@ def reset_all_processing_status():
         db.session.commit()
         return jsonify({'status': 'success', 'message': f'진행 중이던 {res}개 상품을 모두 대기 상태로 초기화했습니다.'})
 
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@api_bp.route('/api/product/download/<style_code>', methods=['GET'])
+@login_required
+def download_product_images(style_code):
+    if not current_user.brand_id:
+        return jsonify({'status': 'error', 'message': '권한 없음'}), 403
+
+    try:
+        brand_name = current_user.brand.brand_name
+        base_path = os.path.join(current_app.root_path, 'static', 'product_images', brand_name, style_code)
+        
+        if not os.path.exists(base_path):
+            return jsonify({'status': 'error', 'message': '이미지 폴더를 찾을 수 없습니다.'}), 404
+            
+        zip_filename = f"{style_code}_images.zip"
+        zip_io = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_io, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(base_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, base_path)
+                    zipf.write(file_path, arcname)
+        
+        zip_io.seek(0)
+        
+        return send_file(
+            zip_io,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=zip_filename
+        )
+        
+    except Exception as e:
+        print(f"Download Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@api_bp.route('/api/product/delete_image_data', methods=['POST'])
+@login_required
+def delete_product_image_data():
+    if not current_user.brand_id:
+        return jsonify({'status': 'error', 'message': '권한 없음'}), 403
+        
+    data = request.json
+    style_codes = data.get('style_codes', [])
+    
+    if not style_codes:
+        return jsonify({'status': 'error', 'message': '선택된 항목이 없습니다.'}), 400
+        
+    try:
+        count = 0
+        brand_name = current_user.brand.brand_name
+        
+        for code in style_codes:
+            products = Product.query.filter(
+                Product.brand_id == current_user.current_brand_id,
+                Product.product_number.like(f"{code}%")
+            ).all()
+            
+            for p in products:
+                p.image_status = 'READY'
+                p.thumbnail_url = None
+                p.detail_image_url = None
+                p.image_drive_link = None
+                p.last_message = None
+                
+            folder_path = os.path.join(current_app.root_path, 'static', 'product_images', brand_name, code)
+            if os.path.exists(folder_path):
+                try:
+                    shutil.rmtree(folder_path)
+                except Exception as fs_err:
+                    print(f"File delete error for {code}: {fs_err}")
+            
+            count += 1
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': f'{count}건의 이미지 데이터 및 파일을 삭제했습니다.'})
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500

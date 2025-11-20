@@ -94,7 +94,7 @@
                                         <th>썸네일</th>
                                         <th>상세컬러</th>
                                         <th>진행상태</th>
-                                        <th>전체저장</th>
+                                        <th>관리</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-processing"></tbody>
@@ -117,7 +117,7 @@
                                         <th>썸네일</th>
                                         <th>상세컬러</th>
                                         <th>진행상태</th>
-                                        <th>전체저장</th>
+                                        <th>관리</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-ready"></tbody>
@@ -140,7 +140,7 @@
                                         <th>썸네일</th>
                                         <th>상세컬러</th>
                                         <th>진행상태</th>
-                                        <th>전체저장</th>
+                                        <th>관리</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-failed"></tbody>
@@ -166,7 +166,7 @@
                                         <th>썸네일</th>
                                         <th>상세컬러</th>
                                         <th>진행상태</th>
-                                        <th>전체저장</th>
+                                        <th>관리</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-completed"></tbody>
@@ -192,7 +192,7 @@
                                         <th>썸네일</th>
                                         <th>상세컬러</th>
                                         <th>진행상태</th>
-                                        <th>전체저장</th>
+                                        <th>관리</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-all"></tbody>
@@ -219,6 +219,8 @@
             const API_PROCESS = document.body.dataset.apiProcess;
             const API_RESET = document.body.dataset.apiReset;
             const API_RESET_ALL = document.body.dataset.apiResetAll;
+            const API_DOWNLOAD = "/api/product/download/";
+            const API_DELETE = "/api/product/delete_image_data";
 
             let isProcessing = false;
             
@@ -331,6 +333,13 @@
                     
                     const disabled = item.status === 'PROCESSING' ? 'disabled' : '';
 
+                    const isCompleted = item.status === 'COMPLETED';
+                    const downloadBtn = isCompleted 
+                        ? `<button class="btn btn-sm btn-outline-dark me-1 btn-download" title="전체 저장"><i class="bi bi-download"></i></button>`
+                        : `<button class="btn btn-sm btn-outline-secondary me-1" disabled><i class="bi bi-download"></i></button>`;
+                    
+                    const deleteBtn = `<button class="btn btn-sm btn-outline-danger btn-delete-data" title="데이터 삭제"><i class="bi bi-trash"></i></button>`;
+
                     tr.innerHTML = `
                         <td><input type="checkbox" class="form-check-input item-check" value="${item.style_code}" ${disabled}></td>
                         <td class="fw-bold">${item.style_code}</td>
@@ -341,7 +350,12 @@
                         <td>${thumbHtml}</td>
                         <td>${detailLink}</td>
                         <td><span class="badge ${badgeClass} status-badge" ${titleAttr} ${dataMsgAttr}>${statusLabel}</span></td>
-                        <td><button class="btn btn-sm btn-outline-dark"><i class="bi bi-download"></i></button></td>
+                        <td>
+                            <div class="d-flex justify-content-center">
+                                ${downloadBtn}
+                                ${deleteBtn}
+                            </div>
+                        </td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -411,7 +425,7 @@
                 }
             });
 
-            document.body.addEventListener('click', (e) => {
+            document.body.addEventListener('click', async (e) => {
                 if (e.target.classList.contains('status-badge') && e.target.classList.contains('bg-danger')) {
                     const message = e.target.dataset.message;
                     if (message) {
@@ -433,6 +447,40 @@
                             }
                             document.body.removeChild(textArea);
                         }
+                    }
+                }
+
+                const downBtn = e.target.closest('.btn-download');
+                if (downBtn) {
+                    const row = downBtn.closest('tr');
+                    const styleCode = row.querySelector('.item-check').value;
+                    window.location.href = API_DOWNLOAD + styleCode;
+                    return;
+                }
+
+                const delBtn = e.target.closest('.btn-delete-data');
+                if (delBtn) {
+                    const row = delBtn.closest('tr');
+                    const styleCode = row.querySelector('.item-check').value;
+                    
+                    if (!confirm(`[${styleCode}]의 이미지 데이터와 파일을 삭제하시겠습니까?\n(상태가 초기화됩니다)`)) return;
+                    
+                    try {
+                        const res = await fetch(API_DELETE, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify({ style_codes: [styleCode] })
+                        });
+                        const json = await res.json();
+                        if (json.status === 'success') {
+                            alert(json.message);
+                            const activeTabBtn = document.querySelector('.nav-link.active');
+                            if(activeTabBtn) loadData(activeTabBtn.dataset.tabType, 1);
+                        } else {
+                            alert('삭제 실패: ' + json.message);
+                        }
+                    } catch (err) {
+                        alert('서버 통신 오류');
                     }
                 }
             });

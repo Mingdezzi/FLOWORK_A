@@ -23,16 +23,12 @@ def _get_rembg_session():
     global _REMBG_SESSION
     if _REMBG_SESSION is None:
         model_name = "u2netp"
-        _log(f"Initializing Rembg session with model: {model_name}")
         _REMBG_SESSION = new_session(model_name)
     return _REMBG_SESSION
 
 def process_style_code_group(brand_id, style_code):
     products = []
     try:
-        _log(f"Start processing group: {style_code} (Brand ID: {brand_id})")
-        
-        # 브랜드 정보 조회 (폴더명 생성용)
         brand = db.session.get(Brand, brand_id)
         if not brand:
             return False, "브랜드 정보를 찾을 수 없습니다."
@@ -43,10 +39,7 @@ def process_style_code_group(brand_id, style_code):
         ).all()
         
         if not products:
-            _log(f"No products found for style code: {style_code}")
             return False, "해당 품번의 상품이 없습니다."
-
-        _log(f"Found {len(products)} products for {style_code}")
 
         variants_map = {}
         for p in products:
@@ -65,73 +58,54 @@ def process_style_code_group(brand_id, style_code):
                     }
                 }
         
-        _log(f"Grouped into {len(variants_map)} colors: {', '.join(variants_map.keys())}")
-
         if not variants_map:
             msg = "처리할 컬러 옵션을 찾을 수 없습니다."
-            _log(msg)
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        # 임시 작업 폴더
         temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_images', style_code)
         os.makedirs(temp_dir, exist_ok=True)
-        _log(f"Created temp directory: {temp_dir}")
 
         patterns_config = _get_brand_url_patterns(brand_id)
         if not patterns_config:
              msg = "이미지 다운로드 URL 패턴 설정이 없습니다."
-             _log(msg)
              _update_product_status(products, 'FAILED', msg)
              return False, msg
 
-        _log("Starting asynchronous image download...")
         asyncio.run(_download_all_variants(style_code, variants_map, patterns_config, temp_dir))
-        _log("Download finished.")
 
         valid_variants = []
         for color_name, data in variants_map.items():
             if data['files']['DF']:
                 rep_image_path = data['files']['DF'][0]
-                _log(f"Removing background for {color_name}: {os.path.basename(rep_image_path)}")
                 nobg_path = _remove_background(rep_image_path)
                 if nobg_path:
                     data['files']['NOBG'] = nobg_path
                     valid_variants.append(data)
             elif data['files']['DM']:
-                 _log(f"No DF image for {color_name}, but DM exists. Using DM only.")
                  valid_variants.append(data)
 
         if not valid_variants:
             msg = "유효한 이미지를 하나도 다운로드하지 못했습니다."
-            _log(msg)
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        _log("Creating thumbnail and detail images...")
         thumbnail_path = _create_thumbnail(valid_variants, temp_dir, style_code)
         detail_path = _create_detail_image(valid_variants, temp_dir, style_code)
 
-        # 로컬 서버 저장소로 이동 (요청하신 구조 반영)
-        _log("Saving files to local server storage...")
         result_links = _save_structure_locally(brand_name, style_code, variants_map, thumbnail_path, detail_path)
-        _log("Save successful.")
 
-        _log("Updating database with results...")
         _update_product_db(products, result_links)
         
-        # 임시 폴더 정리
         try:
             shutil.rmtree(temp_dir)
         except:
             pass
 
-        _log(f"Completed processing for {style_code}")
         return True, f"성공: {len(valid_variants)}개 컬러 처리 완료"
 
     except Exception as e:
         err_msg = f"시스템 오류: {str(e)}\n{traceback.format_exc()}"
-        _log(f"Fatal Error: {err_msg}")
         if products:
             _update_product_status(products, 'FAILED', f"오류 발생: {str(e)}")
         return False, f"오류 발생: {str(e)}"
@@ -162,16 +136,11 @@ def _update_product_db(products, links):
             if 'colordetail' in links:
                 p.detail_image_url = links['colordetail']
             
-            # 로컬 경로는 드라이브 링크 필드 대신 별도로 처리하거나, 
-            # 필요하다면 해당 폴더로 바로가는 내부 링크를 저장할 수도 있습니다.
-            # 여기서는 개별 폴더 링크는 생략합니다.
-            
             updated_count += 1
 
         if updated_count > 0:
             db.session.commit()
     except Exception as e:
-        _log(f"DB Update Failed: {e}")
         db.session.rollback()
 
 def _load_brand_config_from_file(brand_id):
@@ -184,7 +153,7 @@ def _load_brand_config_from_file(brand_id):
             with open(json_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
-        _log(f"Config load error for brand {brand_id}: {e}")
+        pass
     return None
 
 def _get_brand_url_patterns(brand_id):
@@ -248,7 +217,6 @@ async def _download_sequence(session, code, year, patterns, save_dir, img_type, 
                             
                             data_ref['files'][img_type].append(save_path)
                             found_any_pattern = True
-                            _log(f"Downloaded: {filename}")
                             break 
                 except:
                     continue
@@ -279,114 +247,153 @@ def _remove_background(input_path):
                 o.write(output_data)
         return output_path
     except Exception as e:
-        _log(f"Rembg error for {input_path}: {e}")
         return None
 
 def _create_thumbnail(variants, temp_dir, style_code):
     try:
         canvas_size = 800
-        canvas = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 255))
+        canvas = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 0))
+        
         images = []
         for v in variants:
             if v['files']['NOBG']:
                 img = Image.open(v['files']['NOBG']).convert("RGBA")
                 images.append(img)
-        if not images: return None
-
-        count = len(images)
-        grid_layout = _get_grid_layout(count)
-        cell_size = canvas_size // 2 
         
-        for idx, img in enumerate(images):
-            if idx >= len(grid_layout): break
-            row, col = grid_layout[idx]
-            target_h = int(canvas_size * 0.55) 
+        if not images: return None
+        
+        count = len(images)
+        target_h = int(canvas_size * 0.75)
+        
+        resized_images = []
+        for img in images:
             width, height = img.size
             ratio = target_h / height
             new_w = int(width * ratio)
             new_h = int(height * ratio)
-            resized = img.resize((new_w, new_h), RESAMPLE_LANCZOS)
+            resized_images.append(img.resize((new_w, new_h), RESAMPLE_LANCZOS))
+        
+        first_w, first_h = resized_images[0].size
+        
+        if count == 1:
+            start_x = (canvas_size - first_w) // 2
+            start_y = (canvas_size - first_h) // 2
+            step_x, step_y = 0, 0
+        else:
+            min_x = 50
+            min_y = 50
+            max_x = canvas_size - first_w - 50
+            max_y = canvas_size - first_h - 50
             
-            cx = int(col * cell_size + cell_size / 2)
-            cy = int(row * cell_size + cell_size / 2)
-            x = cx - new_w // 2
-            y = cy - new_h // 2
+            if max_x < min_x: 
+                start_x = (canvas_size - first_w) // 2
+                step_x = 30
+            else:
+                start_x = min_x
+                step_x = (max_x - min_x) // (count - 1)
+                
+            if max_y < min_y:
+                start_y = (canvas_size - first_h) // 2
+                step_y = 30
+            else:
+                start_y = min_y
+                step_y = (max_y - min_y) // (count - 1)
+                
+        for idx, img in enumerate(resized_images):
+            x = int(start_x + (idx * step_x))
+            y = int(start_y + (idx * step_y))
             
-            jitter_x = random.randint(-10, 10)
-            jitter_y = random.randint(-10, 10)
-            canvas.alpha_composite(resized, (x + jitter_x, y + jitter_y))
+            x = max(0, min(x, canvas_size - img.width))
+            y = max(0, min(y, canvas_size - img.height))
+            
+            canvas.alpha_composite(img, (x, y))
             
         output_path = os.path.join(temp_dir, f"{style_code}_thumbnail.png")
         canvas.save(output_path)
         return output_path
+        
     except Exception as e:
-        _log(f"Thumbnail creation error: {e}")
+        traceback.print_exc()
         return None
-
-def _get_grid_layout(count):
-    if count == 1: return [(0.5, 0.5)] 
-    if count == 2: return [(0.5, 0), (0.5, 1)]
-    if count == 3: return [(0, 0.5), (1, 0), (1, 1)]
-    layout = []
-    for r in range(2):
-        for c in range(2):
-            layout.append((r, c))
-    return layout
 
 def _create_detail_image(variants, temp_dir, style_code):
     try:
-        width = 800
-        item_height = 800
-        total_height = item_height * len(variants)
-        canvas = Image.new("RGBA", (width, total_height), (255, 255, 255, 255))
+        canvas_width = 800
+        cell_width = canvas_width // 2
+        target_img_width = int(cell_width * 0.9)
+        text_area_height = 80
+        
+        if not variants or not variants[0]['files']['NOBG']: return None
+        
+        sample_img = Image.open(variants[0]['files']['NOBG'])
+        ratio = target_img_width / sample_img.width
+        target_img_height = int(sample_img.height * ratio)
+        
+        cell_height = target_img_height + text_area_height + 40
+        
+        count = len(variants)
+        rows = (count + 1) // 2
+        total_height = rows * cell_height
+        
+        canvas = Image.new("RGBA", (canvas_width, total_height), (255, 255, 255, 255))
         draw = ImageDraw.Draw(canvas)
+        
+        font = None
         try:
-            font = ImageFont.truetype("arial.ttf", 40)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf", 25)
         except:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("arial.ttf", 25)
+            except:
+                font = ImageFont.load_default()
 
         for idx, v in enumerate(variants):
             if not v['files']['NOBG']: continue
+            
             img = Image.open(v['files']['NOBG']).convert("RGBA")
+            
             w, h = img.size
-            ratio = (item_height - 100) / h
+            ratio = target_img_width / w
             new_w = int(w * ratio)
             new_h = int(h * ratio)
             resized = img.resize((new_w, new_h), RESAMPLE_LANCZOS)
-            y_offset = idx * item_height
-            x_pos = (width - new_w) // 2
-            y_pos = y_offset + 50
-            canvas.alpha_composite(resized, (x_pos, y_pos))
             
-            text = f"COLOR: {v['color_code']}"
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_w = bbox[2] - bbox[0]
-            draw.text(((width - text_w) // 2, y_offset + item_height - 60), text, fill="black", font=font)
+            row = idx // 2
+            col = idx % 2
+            
+            cell_x = col * cell_width
+            cell_y = row * cell_height
+            
+            img_x = cell_x + (cell_width - new_w) // 2
+            img_y = cell_y + 20
+            
+            canvas.alpha_composite(resized, (img_x, img_y))
+            
+            color_text = f"#COLOR : {v['color_code']}"
+            
+            try:
+                bbox = draw.textbbox((0, 0), color_text, font=font)
+                text_w = bbox[2] - bbox[0]
+            except:
+                text_w = len(color_text) * 10
+            
+            text_x = cell_x + (cell_width - text_w) // 2
+            text_y = img_y + new_h + 15
+            
+            draw.text((text_x, text_y), color_text, fill="black", font=font)
             
         output_path = os.path.join(temp_dir, f"{style_code}_detail.png")
         canvas.save(output_path)
         return output_path
+        
     except Exception as e:
-        _log(f"Detail image creation error: {e}")
+        traceback.print_exc()
         return None
 
 def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, detail_path):
-    """
-    요청하신 구조로 로컬 서버에 저장합니다.
-    Root: static/product_images/
-    Structure:
-      - {Brand}/{Pn}/{Color}/ORIGINAL/
-      - {Brand}/{Pn}/{Color}/NOBG/
-      - {Brand}/{Pn}/THUMBNAIL/
-      - {Brand}/{Pn}/COLORDETAIL/
-      - {Brand}/{Pn}/DETAIL/
-    """
     base_static_path = os.path.join(current_app.root_path, 'static', 'product_images')
-    
-    # 브랜드명/품번 폴더 (예: flowork/static/product_images/아이더/DMM25201)
     product_base_dir = os.path.join(base_static_path, brand_name, style_code)
     
-    # 각 카테고리 폴더 미리 생성
     thumb_dir = os.path.join(product_base_dir, 'THUMBNAIL')
     colordetail_dir = os.path.join(product_base_dir, 'COLORDETAIL')
     detail_dir = os.path.join(product_base_dir, 'DETAIL')
@@ -397,19 +404,16 @@ def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, de
     
     result = {'thumbnail': None, 'colordetail': None}
 
-    # 1. 썸네일 저장
     if thumb_path and os.path.exists(thumb_path):
         dest_thumb = os.path.join(thumb_dir, f"{style_code}_thumb.png")
         shutil.copy2(thumb_path, dest_thumb)
         result['thumbnail'] = f"/static/product_images/{brand_name}/{style_code}/THUMBNAIL/{style_code}_thumb.png"
         
-    # 2. 상세 컬러 가이드 저장 (COLORDETAIL)
     if detail_path and os.path.exists(detail_path):
         dest_detail = os.path.join(colordetail_dir, f"{style_code}_colordetail.png")
         shutil.copy2(detail_path, dest_detail)
         result['colordetail'] = f"/static/product_images/{brand_name}/{style_code}/COLORDETAIL/{style_code}_colordetail.png"
         
-    # 3. 컬러별 원본(ORIGINAL) 및 누끼(NOBG) 저장
     for color_name, data in variants_map.items():
         color_base_dir = os.path.join(product_base_dir, color_name)
         original_dir = os.path.join(color_base_dir, 'ORIGINAL')
@@ -418,17 +422,14 @@ def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, de
         os.makedirs(original_dir, exist_ok=True)
         os.makedirs(nobg_dir, exist_ok=True)
         
-        # DF 파일 저장 (ORIGINAL)
         for path in data['files']['DF']:
             filename = os.path.basename(path)
             shutil.copy2(path, os.path.join(original_dir, filename))
             
-        # DM 파일 저장 (ORIGINAL - 필요 시)
         for path in data['files']['DM']:
             filename = os.path.basename(path)
             shutil.copy2(path, os.path.join(original_dir, filename))
             
-        # 배경 제거 이미지 저장 (NOBG)
         if data['files']['NOBG'] and os.path.exists(data['files']['NOBG']):
             filename = os.path.basename(data['files']['NOBG'])
             shutil.copy2(data['files']['NOBG'], os.path.join(nobg_dir, filename))
