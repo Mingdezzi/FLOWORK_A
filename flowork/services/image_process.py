@@ -43,20 +43,28 @@ def process_style_code_group(brand_id, style_code):
 
         variants_map = {}
         for p in products:
-            color_name = "UnknownColor"
-            if p.variants and len(p.variants) > 0:
-                color_name = p.variants[0].color or "UnknownColor"
+            if not p.variants:
+                continue
+
+            unique_colors = set()
+            for v in p.variants:
+                if v.color:
+                    unique_colors.add(v.color)
             
-            if color_name not in variants_map:
-                variants_map[color_name] = {
-                    'product': p,
-                    'color_code': color_name,
-                    'files': {
-                        'DF': [], 
-                        'DM': [], 
-                        'NOBG': None 
+            if not unique_colors:
+                unique_colors.add("UnknownColor")
+
+            for color_name in unique_colors:
+                if color_name not in variants_map:
+                    variants_map[color_name] = {
+                        'product': p,
+                        'color_code': color_name,
+                        'files': {
+                            'DF': [], 
+                            'DM': [], 
+                            'NOBG': None 
+                        }
                     }
-                }
         
         if not variants_map:
             msg = "처리할 컬러 옵션을 찾을 수 없습니다."
