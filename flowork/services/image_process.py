@@ -6,7 +6,7 @@ import random
 import traceback
 import json
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
 from flask import current_app
 from flowork.extensions import db
 from flowork.models import Product, Setting, Brand
@@ -256,24 +256,46 @@ def _remove_background(input_path):
     except Exception as e:
         return None
 
+def _calculate_brightness(image):
+    try:
+        greyscale_image = image.convert('L')
+        stat = ImageStat.Stat(greyscale_image)
+        return stat.mean[0]
+    except:
+        return 0
+
 def _create_thumbnail(variants, temp_dir, style_code):
     try:
         canvas_size = 800
         canvas = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 0))
         
-        images = []
+        loaded_images = []
         for v in variants:
             if v['files']['NOBG']:
                 img = Image.open(v['files']['NOBG']).convert("RGBA")
-                images.append(img)
+                brightness = _calculate_brightness(img)
+                loaded_images.append({'img': img, 'brightness': brightness})
         
-        if not images: return None
+        if not loaded_images: return None
         
-        count = len(images)
-        target_h = int(canvas_size * 0.75)
+        loaded_images.sort(key=lambda x: x['brightness'], reverse=True)
+        
+        count = len(loaded_images)
+        
+        if count == 1:
+            scale = 1.0
+        elif count <= 2:
+            scale = 0.90
+        elif count <= 4:
+            scale = 0.80
+        else:
+            scale = 0.70
+            
+        target_h = int(canvas_size * scale)
         
         resized_images = []
-        for img in images:
+        for item in loaded_images:
+            img = item['img']
             width, height = img.size
             ratio = target_h / height
             new_w = int(width * ratio)
@@ -287,24 +309,14 @@ def _create_thumbnail(variants, temp_dir, style_code):
             start_y = (canvas_size - first_h) // 2
             step_x, step_y = 0, 0
         else:
-            min_x = 50
-            min_y = 50
-            max_x = canvas_size - first_w - 50
-            max_y = canvas_size - first_h - 50
+            start_x = 0
+            start_y = 0
             
-            if max_x < min_x: 
-                start_x = (canvas_size - first_w) // 2
-                step_x = 30
-            else:
-                start_x = min_x
-                step_x = (max_x - min_x) // (count - 1)
-                
-            if max_y < min_y:
-                start_y = (canvas_size - first_h) // 2
-                step_y = 30
-            else:
-                start_y = min_y
-                step_y = (max_y - min_y) // (count - 1)
+            x_range = max(0, canvas_size - first_w)
+            y_range = max(0, canvas_size - first_h)
+            
+            step_x = x_range // (count - 1) if count > 1 else 0
+            step_y = y_range // (count - 1) if count > 1 else 0
                 
         for idx, img in enumerate(resized_images):
             x = int(start_x + (idx * step_x))
