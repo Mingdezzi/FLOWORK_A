@@ -61,7 +61,7 @@ def run_async_import_db(app, task_id, file_path, form_data, brand_id):
             if os.path.exists(file_path):
                 os.remove(file_path)
 
-def run_async_image_process(app, task_id, brand_id, style_codes):
+def run_async_image_process(app, task_id, brand_id, style_codes, options=None):
     with app.app_context():
         try:
             total = len(style_codes)
@@ -71,7 +71,7 @@ def run_async_image_process(app, task_id, brand_id, style_codes):
             for i, code in enumerate(style_codes):
                 update_task_status(task_id, i, total)
                 
-                success, msg = process_style_code_group(brand_id, code)
+                success, msg = process_style_code_group(brand_id, code, options=options)
                 results.append({'code': code, 'success': success, 'message': msg})
                 if success:
                     success_count += 1
