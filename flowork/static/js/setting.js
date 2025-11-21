@@ -21,9 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateStaffUrlPrefix = bodyData.apiStaffUpdateUrlPrefix;
     const deleteStaffUrlPrefix = bodyData.apiStaffDeleteUrlPrefix;
 
-    // [신규] 설정 파일 로드 및 설정 저장 URL
+    // [신규] 설정 파일 로드, 설정 저장, 로고 업로드 URL
     const loadSettingsUrl = bodyData.apiLoadSettingsUrl;
     const updateSettingUrl = bodyData.apiSettingUrl;
+    const logoUploadUrl = bodyData.apiLogoUploadUrl;
 
     // --- DOM 요소 ---
     const brandNameForm = document.getElementById('form-brand-name');
@@ -31,6 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadSettingsBtn = document.getElementById('btn-load-settings');
     const loadSettingsStatus = document.getElementById('load-settings-status');
+
+    // [신규] 로고 업로드 DOM
+    const logoForm = document.getElementById('form-logo-upload');
+    const logoStatus = document.getElementById('logo-upload-status');
 
     const addStoreForm = document.getElementById('form-add-store');
     const addStoreStatus = document.getElementById('add-store-status');
@@ -86,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({ brand_name: brandName })
                 });
@@ -107,7 +112,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 2. [신규] 설정 파일 로드 ---
+    // --- 2. [신규] 로고 업로드 처리 ---
+    if (logoForm) {
+        logoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('logo-file-input');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('업로드할 로고 파일을 선택해주세요.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('logo_file', file);
+
+            const btn = document.getElementById('btn-upload-logo');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 업로드 중...';
+            logoStatus.innerHTML = '';
+
+            try {
+                const response = await fetch(logoUploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok || data.status === 'error') {
+                    throw new Error(data.message || '업로드 실패');
+                }
+
+                logoStatus.innerHTML = `<div class="alert alert-success mt-2">${data.message}</div>`;
+                // 필요 시 페이지 새로고침 없이 이미지 프리뷰 갱신 로직 추가 가능
+
+            } catch (error) {
+                console.error('Logo upload error:', error);
+                logoStatus.innerHTML = `<div class="alert alert-danger mt-2">오류: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-upload me-1"></i>로고 업로드';
+            }
+        });
+    }
+
+    // --- 3. [신규] 설정 파일 로드 ---
     if (loadSettingsBtn) {
         loadSettingsBtn.addEventListener('click', async () => {
             if (!confirm('서버에 저장된 브랜드 설정 파일을 로드하여 DB에 적용하시겠습니까?\n(기존 설정이 덮어씌워질 수 있습니다.)')) {
@@ -121,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(loadSettingsUrl, { 
                     method: 'POST',
                     headers: {
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     }
                 });
                 const data = await response.json();
@@ -129,8 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error(data.message || '설정 로드 실패');
 
                 loadSettingsStatus.innerHTML = `<div class="alert alert-success mt-2">${data.message}</div>`;
-                // 페이지를 새로고침하여 로드된 설정을 반영할 수도 있음
-                // location.reload(); 
             } catch (error) {
                 console.error('Settings load error:', error);
                 loadSettingsStatus.innerHTML = `<div class="alert alert-danger mt-2">오류: ${error.message}</div>`;
@@ -140,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 3. [신규] 카테고리 버튼 설정 ---
+    // --- 4. [신규] 카테고리 버튼 설정 ---
     
     // UI 헬퍼: 입력 행 추가
     function addCategoryInputRow(label = '', value = '') {
@@ -159,22 +210,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (catForm) {
-        // [수정] 초기화 로직: 서버에서 전달받은 설정값(window.initialCategoryConfig)이 있으면 사용
         const savedConfig = window.initialCategoryConfig;
 
         if (savedConfig) {
-            // 저장된 설정으로 UI 복원
             if (savedConfig.columns) {
                 catColumns.value = savedConfig.columns;
             }
             if (savedConfig.buttons && Array.isArray(savedConfig.buttons)) {
-                catContainer.innerHTML = ''; // 비우고 시작
+                catContainer.innerHTML = ''; 
                 savedConfig.buttons.forEach(btn => {
                     addCategoryInputRow(btn.label, btn.value);
                 });
             }
         } else {
-            // 저장된 설정이 없으면 기본값 표시
             if (catContainer.children.length === 0) {
                 addCategoryInputRow('전체', '전체');
                 addCategoryInputRow('신발', '신발');
@@ -183,19 +231,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 버튼 추가 클릭
         btnAddCat.addEventListener('click', () => {
             addCategoryInputRow();
         });
 
-        // 행 삭제 (이벤트 위임)
         catContainer.addEventListener('click', (e) => {
             if (e.target.closest('.btn-remove-cat')) {
                 e.target.closest('.cat-row').remove();
             }
         });
 
-        // 설정 저장
         catForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -229,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({
                         key: 'CATEGORY_CONFIG',
@@ -253,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- 4. 매장 관리 (기존 코드 유지) ---
+    // --- 5. 매장 관리 ---
     if (addStoreForm) {
         addStoreForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -276,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({
                         store_code: storeCode, 
@@ -328,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${deleteStoreUrlPrefix}${storeId}`, { 
                 method: 'DELETE',
                 headers: {
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken
                 }
             });
             const data = await response.json();
@@ -367,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({ store_code: storeCode, store_name: storeName, store_phone: storePhone })
                 });
@@ -394,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${approveStoreUrlPrefix}${storeId}`, { 
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken
                 }
             });
             if (response.ok) { window.location.reload(); } 
@@ -410,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${toggleStoreActiveUrlPrefix}${storeId}`, { 
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken
                 }
             });
             if (response.ok) { window.location.reload(); }
@@ -425,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${resetStoreUrlPrefix}${storeId}`, { 
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken
                 }
             });
             if (response.ok) { window.location.reload(); }
@@ -464,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (storesTableBody) storesTableBody.insertAdjacentHTML('beforeend', newRowHtml);
     }
 
-    // --- 5. 직원 관리 (기존 코드 유지) ---
+    // --- 6. 직원 관리 ---
     if (addStaffForm) {
         addStaffForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -482,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({ name, position, contact })
                 });
@@ -517,7 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${deleteStaffUrlPrefix}${button.dataset.id}`, { 
                 method: 'DELETE',
                 headers: {
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken
                 }
             });
             if (response.ok) {
@@ -549,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({ name, position, contact })
                 });
