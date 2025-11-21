@@ -278,7 +278,7 @@ def _trim_image(img):
 def _create_thumbnail(variants, temp_dir, style_code, bg_color=(255, 255, 255)):
     try:
         canvas_size = 800
-        PADDING = 40 
+        PADDING = 10 
         
         layout_layer = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 0))
         
@@ -297,13 +297,17 @@ def _create_thumbnail(variants, temp_dir, style_code, bg_color=(255, 255, 255)):
         count = len(loaded_images)
         
         if count == 1:
-            scale = 0.9
+            scale = 0.90
         elif count == 2:
-            scale = 0.85 
-        elif count <= 4:
             scale = 0.80
+        elif count == 3:
+            scale = 0.75
+        elif count == 4:
+            scale = 0.70
+        elif count == 5:
+            scale = 0.65
         else:
-            scale = 0.70 
+            scale = 0.60
             
         target_max_size = int(canvas_size * scale)
         
