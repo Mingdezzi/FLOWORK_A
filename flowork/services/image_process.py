@@ -269,15 +269,24 @@ def _calculate_brightness(image):
     except:
         return 0
 
-def _create_thumbnail(variants, temp_dir, style_code):
+def _trim_image(img):
+    bbox = img.getbbox()
+    if bbox:
+        return img.crop(bbox)
+    return img
+
+def _create_thumbnail(variants, temp_dir, style_code, bg_color=(255, 255, 255)):
     try:
         canvas_size = 800
-        canvas = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 0))
+        PADDING = 40 
+        
+        layout_layer = Image.new("RGBA", (canvas_size, canvas_size), (255, 255, 255, 0))
         
         loaded_images = []
         for v in variants:
             if v['files']['NOBG']:
                 img = Image.open(v['files']['NOBG']).convert("RGBA")
+                img = _trim_image(img)
                 brightness = _calculate_brightness(img)
                 loaded_images.append({'img': img, 'brightness': brightness})
         
@@ -288,23 +297,30 @@ def _create_thumbnail(variants, temp_dir, style_code):
         count = len(loaded_images)
         
         if count == 1:
-            scale = 1.0
-        elif count <= 2:
-            scale = 0.90
+            scale = 0.9
+        elif count == 2:
+            scale = 0.85 
         elif count <= 4:
             scale = 0.80
         else:
-            scale = 0.70
+            scale = 0.70 
             
-        target_h = int(canvas_size * scale)
+        target_max_size = int(canvas_size * scale)
         
         resized_images = []
         for item in loaded_images:
             img = item['img']
             width, height = img.size
-            ratio = target_h / height
-            new_w = int(width * ratio)
-            new_h = int(height * ratio)
+            
+            if width > height:
+                ratio = target_max_size / width
+                new_w = target_max_size
+                new_h = int(height * ratio)
+            else:
+                ratio = target_max_size / height
+                new_h = target_max_size
+                new_w = int(width * ratio)
+                
             resized_images.append(img.resize((new_w, new_h), RESAMPLE_LANCZOS))
         
         first_w, first_h = resized_images[0].size
@@ -314,33 +330,42 @@ def _create_thumbnail(variants, temp_dir, style_code):
             start_y = (canvas_size - first_h) // 2
             step_x, step_y = 0, 0
         else:
-            start_x = 0
-            start_y = 0
+            start_x = PADDING
+            start_y = PADDING
             
-            x_range = max(0, canvas_size - first_w)
-            y_range = max(0, canvas_size - first_h)
+            max_x = canvas_size - PADDING - first_w
+            max_y = canvas_size - PADDING - first_h
             
-            step_x = x_range // (count - 1) if count > 1 else 0
-            step_y = y_range // (count - 1) if count > 1 else 0
+            if max_x < start_x: 
+                start_x = (canvas_size - first_w) // 2
+                max_x = start_x
+            if max_y < start_y:
+                start_y = (canvas_size - first_h) // 2
+                max_y = start_y
+
+            travel_x = max_x - start_x
+            travel_y = max_y - start_y
+            
+            step_x = travel_x // (count - 1) if count > 1 else 0
+            step_y = travel_y // (count - 1) if count > 1 else 0
                 
         for idx, img in enumerate(resized_images):
             x = int(start_x + (idx * step_x))
             y = int(start_y + (idx * step_y))
+            layout_layer.alpha_composite(img, (x, y))
             
-            x = max(0, min(x, canvas_size - img.width))
-            y = max(0, min(y, canvas_size - img.height))
+        final_image = Image.new("RGB", (canvas_size, canvas_size), bg_color)
+        final_image.paste(layout_layer, (0, 0), layout_layer)
             
-            canvas.alpha_composite(img, (x, y))
-            
-        output_path = os.path.join(temp_dir, f"{style_code}_thumbnail.png")
-        canvas.save(output_path)
+        output_path = os.path.join(temp_dir, f"{style_code}_thumbnail.jpg")
+        final_image.save(output_path, "JPEG", quality=95)
         return output_path
         
     except Exception as e:
         traceback.print_exc()
         return None
 
-def _create_detail_image(variants, temp_dir, style_code):
+def _create_detail_image(variants, temp_dir, style_code, bg_color=(255, 255, 255)):
     try:
         canvas_width = 800
         cell_width = canvas_width // 2
@@ -350,6 +375,8 @@ def _create_detail_image(variants, temp_dir, style_code):
         if not variants or not variants[0]['files']['NOBG']: return None
         
         sample_img = Image.open(variants[0]['files']['NOBG'])
+        sample_img = _trim_image(sample_img)
+        
         ratio = target_img_width / sample_img.width
         target_img_height = int(sample_img.height * ratio)
         
@@ -359,8 +386,8 @@ def _create_detail_image(variants, temp_dir, style_code):
         rows = (count + 1) // 2
         total_height = rows * cell_height
         
-        canvas = Image.new("RGBA", (canvas_width, total_height), (255, 255, 255, 255))
-        draw = ImageDraw.Draw(canvas)
+        layout_layer = Image.new("RGBA", (canvas_width, total_height), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(layout_layer)
         
         font = None
         try:
@@ -375,6 +402,7 @@ def _create_detail_image(variants, temp_dir, style_code):
             if not v['files']['NOBG']: continue
             
             img = Image.open(v['files']['NOBG']).convert("RGBA")
+            img = _trim_image(img)
             
             w, h = img.size
             ratio = target_img_width / w
@@ -391,7 +419,7 @@ def _create_detail_image(variants, temp_dir, style_code):
             img_x = cell_x + (cell_width - new_w) // 2
             img_y = cell_y + 20
             
-            canvas.alpha_composite(resized, (img_x, img_y))
+            layout_layer.alpha_composite(resized, (img_x, img_y))
             
             color_text = f"#COLOR : {v['color_code']}"
             
@@ -406,8 +434,11 @@ def _create_detail_image(variants, temp_dir, style_code):
             
             draw.text((text_x, text_y), color_text, fill="black", font=font)
             
-        output_path = os.path.join(temp_dir, f"{style_code}_detail.png")
-        canvas.save(output_path)
+        final_image = Image.new("RGB", (canvas_width, total_height), bg_color)
+        final_image.paste(layout_layer, (0, 0), layout_layer)
+
+        output_path = os.path.join(temp_dir, f"{style_code}_detail.jpg")
+        final_image.save(output_path, "JPEG", quality=90)
         return output_path
         
     except Exception as e:
@@ -429,14 +460,14 @@ def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, de
     result = {'thumbnail': None, 'colordetail': None}
 
     if thumb_path and os.path.exists(thumb_path):
-        dest_thumb = os.path.join(thumb_dir, f"{style_code}_thumb.png")
+        dest_thumb = os.path.join(thumb_dir, f"{style_code}_thumb.jpg")
         shutil.copy2(thumb_path, dest_thumb)
-        result['thumbnail'] = f"/static/product_images/{brand_name}/{style_code}/THUMBNAIL/{style_code}_thumb.png"
+        result['thumbnail'] = f"/static/product_images/{brand_name}/{style_code}/THUMBNAIL/{style_code}_thumb.jpg"
         
     if detail_path and os.path.exists(detail_path):
-        dest_detail = os.path.join(colordetail_dir, f"{style_code}_colordetail.png")
+        dest_detail = os.path.join(colordetail_dir, f"{style_code}_colordetail.jpg")
         shutil.copy2(detail_path, dest_detail)
-        result['colordetail'] = f"/static/product_images/{brand_name}/{style_code}/COLORDETAIL/{style_code}_colordetail.png"
+        result['colordetail'] = f"/static/product_images/{brand_name}/{style_code}/COLORDETAIL/{style_code}_colordetail.jpg"
         
     for color_name, data in variants_map.items():
         color_base_dir = os.path.join(product_base_dir, color_name)
@@ -444,21 +475,18 @@ def _save_structure_locally(brand_name, style_code, variants_map, thumb_path, de
         model_dir = os.path.join(color_base_dir, 'MODEL')
         nobg_dir = os.path.join(color_base_dir, 'NOBG')
         
-        # DF -> ORIGINAL
         if data['files']['DF']:
             os.makedirs(original_dir, exist_ok=True)
             for path in data['files']['DF']:
                 filename = os.path.basename(path)
                 shutil.copy2(path, os.path.join(original_dir, filename))
         
-        # DM -> MODEL
         if data['files']['DM']:
             os.makedirs(model_dir, exist_ok=True)
             for path in data['files']['DM']:
                 filename = os.path.basename(path)
                 shutil.copy2(path, os.path.join(model_dir, filename))
             
-        # NOBG -> NOBG
         if data['files']['NOBG'] and os.path.exists(data['files']['NOBG']):
             os.makedirs(nobg_dir, exist_ok=True)
             filename = os.path.basename(data['files']['NOBG'])
