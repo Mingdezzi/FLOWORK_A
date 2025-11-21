@@ -1190,3 +1190,11 @@ body[data-page-mode="edit"] #btn-enable-edit {
 .hover-text-danger:hover {
     color: #dc3545 !important;
 }
+
+/* Online Management & Options Panel */
+.status-badge { font-size: 0.85rem; width: 80px; cursor: help; }
+.status-badge.bg-danger { cursor: pointer; }
+.img-preview { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #dee2e6; }
+.img-placeholder { width: 40px; height: 40px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; color: #adb5bd; }
+.options-panel { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+.options-panel label { font-size: 0.85rem; font-weight: bold; margin-bottom: 0.25rem; display: block; }

@@ -104,6 +104,7 @@ def trigger_image_process():
          
     data = request.json
     style_codes = data.get('style_codes', [])
+    # [수정] 프론트엔드에서 전달된 옵션값(여백, 방향, 배경색, 로고위치) 수신
     options = data.get('options', {})
     
     if not style_codes:
@@ -136,7 +137,7 @@ def trigger_image_process():
                 task_id,
                 current_user.current_brand_id,
                 style_codes,
-                options
+                options  # [수정] 비동기 작업 함수로 옵션 전달
             )
         )
         thread.start()

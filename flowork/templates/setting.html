@@ -66,7 +66,7 @@
                     </form>
                     <div class="form-text mb-2">
                         * 권장 사이즈: 높이 80px 이상 (투명 배경 PNG 권장)<br>
-                        * 업로드된 로고는 썸네일 이미지 생성 시 좌측 상단에 자동 합성됩니다.
+                        * 업로드된 로고는 썸네일 이미지 생성 시 상단에 자동 합성됩니다.
                     </div>
                     <div id="logo-upload-status"></div>
                     
@@ -572,11 +572,11 @@
                         });
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.message || '실패');
-                        loadSettingsStatus.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                        loadSettingsStatus.innerHTML = `<div class="alert alert-success mt-2">${data.message}</div>`;
                         setTimeout(() => window.location.reload(), 1000);
                     } catch (error) {
                         console.error('Settings load error:', error);
-                        loadSettingsStatus.innerHTML = `<div class="alert alert-danger">오류: ${error.message}</div>`;
+                        loadSettingsStatus.innerHTML = `<div class="alert alert-danger mt-2">오류: ${error.message}</div>`;
                     } finally {
                         loadSettingsBtn.disabled = false;
                     }

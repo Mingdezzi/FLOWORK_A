@@ -110,6 +110,7 @@ def process_style_code_group(brand_id, style_code, options=None):
         if not os.path.exists(logo_path):
             logo_path = None
 
+        # [수정] options 인자를 _create_thumbnail로 전달
         thumbnail_path = _create_thumbnail(valid_variants, temp_dir, style_code, logo_path=logo_path, options=options)
         detail_path = _create_detail_image(valid_variants, temp_dir, style_code, options=options)
 
@@ -326,15 +327,15 @@ def _create_thumbnail(variants, temp_dir, style_code, logo_path=None, options=No
         canvas_w = 800
         canvas_h = 800
         
-        # 옵션값 파싱
         PADDING = int(options.get('padding', 10))
         direction = options.get('direction', 'SE')
         bg_hex = options.get('bg_color', '#FFFFFF')
         bg_color = _hex_to_rgb(bg_hex)
         
+        # [수정] options에서 로고 정렬 값 가져오기
         logo_config = {
             'height': 80,
-            'align': 'left'
+            'align': options.get('logo_align', 'left')
         }
         
         logo_area_h = logo_config['height'] if logo_path else 0
@@ -393,17 +394,14 @@ def _create_thumbnail(variants, temp_dir, style_code, logo_path=None, options=No
         
         offset_y = logo_area_h
         
-        # 배치 영역의 좌표 범위 계산
         min_x = PADDING
         max_x = prod_area_w - PADDING - first_w
         min_y = offset_y + PADDING
         max_y = offset_y + prod_area_h - PADDING - first_h
         
-        # 중앙값 계산
         center_x = (prod_area_w - first_w) // 2
         center_y = offset_y + (prod_area_h - first_h) // 2
         
-        # 이미지가 영역보다 큰 경우 처리
         if max_x < min_x: max_x = min_x = center_x
         if max_y < min_y: max_y = min_y = center_y
 
@@ -413,31 +411,31 @@ def _create_thumbnail(variants, temp_dir, style_code, logo_path=None, options=No
         if count > 1:
             s_x, s_y, e_x, e_y = 0, 0, 0, 0
             
-            if direction == 'SE': # ↘
+            if direction == 'SE': 
                 s_x, s_y = min_x, min_y
                 e_x, e_y = max_x, max_y
-            elif direction == 'SW': # ↙
+            elif direction == 'SW': 
                 s_x, s_y = max_x, min_y
                 e_x, e_y = min_x, max_y
-            elif direction == 'NE': # ↗
+            elif direction == 'NE': 
                 s_x, s_y = min_x, max_y
                 e_x, e_y = max_x, min_y
-            elif direction == 'NW': # ↖
+            elif direction == 'NW': 
                 s_x, s_y = max_x, max_y
                 e_x, e_y = min_x, min_y
-            elif direction == 'E': # →
+            elif direction == 'E': 
                 s_x, s_y = min_x, center_y
                 e_x, e_y = max_x, center_y
-            elif direction == 'W': # ←
+            elif direction == 'W': 
                 s_x, s_y = max_x, center_y
                 e_x, e_y = min_x, center_y
-            elif direction == 'S': # ↓
+            elif direction == 'S': 
                 s_x, s_y = center_x, min_y
                 e_x, e_y = center_x, max_y
-            elif direction == 'N': # ↑
+            elif direction == 'N': 
                 s_x, s_y = center_x, max_y
                 e_x, e_y = center_x, min_y
-            else: # Default SE
+            else: 
                 s_x, s_y = min_x, min_y
                 e_x, e_y = max_x, max_y
 

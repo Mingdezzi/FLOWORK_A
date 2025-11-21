@@ -70,7 +70,7 @@ def upload_brand_logo():
         static_folder = os.path.join(current_app.root_path, 'static')
         os.makedirs(static_folder, exist_ok=True)
         
-        # [수정] 메인 로고(logo.png)와 충돌하지 않도록 별도 파일명 사용
+        # 썸네일 생성 전용 로고 파일명으로 저장 (기존 사이트 로고와 구분)
         file_path = os.path.join(static_folder, 'thumbnail_logo.png')
         file.save(file_path)
         
