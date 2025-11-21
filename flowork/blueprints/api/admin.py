@@ -53,6 +53,33 @@ def update_brand_name():
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': f'서버 오류: {e}'}), 500
 
+@api_bp.route('/api/setting/logo', methods=['POST'])
+@admin_required
+def upload_brand_logo():
+    if not current_user.brand_id or current_user.store_id:
+        return jsonify({'status': 'error', 'message': '본사 관리자만 로고를 설정할 수 있습니다.'}), 403
+
+    if 'logo_file' not in request.files:
+        return jsonify({'status': 'error', 'message': '파일이 없습니다.'}), 400
+        
+    file = request.files['logo_file']
+    if file.filename == '':
+        return jsonify({'status': 'error', 'message': '선택된 파일이 없습니다.'}), 400
+
+    try:
+        static_folder = os.path.join(current_app.root_path, 'static')
+        os.makedirs(static_folder, exist_ok=True)
+        
+        file_path = os.path.join(static_folder, 'logo.png')
+        file.save(file_path)
+        
+        return jsonify({'status': 'success', 'message': '로고가 성공적으로 업로드되었습니다.'})
+        
+    except Exception as e:
+        print(f"Logo upload error: {e}")
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'로고 저장 실패: {e}'}), 500
+
 @api_bp.route('/api/setting/load_from_file', methods=['POST'])
 @admin_required
 def load_settings_from_file():
