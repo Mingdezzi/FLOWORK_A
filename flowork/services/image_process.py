@@ -99,7 +99,8 @@ def process_style_code_group(brand_id, style_code):
             _update_product_status(products, 'FAILED', msg)
             return False, msg
 
-        logo_path = os.path.join(current_app.root_path, 'static', 'logo.png')
+        # [수정] 메인 로고와 겹치지 않는 전용 로고 파일 사용
+        logo_path = os.path.join(current_app.root_path, 'static', 'thumbnail_logo.png')
         if not os.path.exists(logo_path):
             logo_path = None
 
