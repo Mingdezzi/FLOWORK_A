@@ -62,11 +62,9 @@ def generate_barcode(row_data, brand_settings=None):
         if pn_final and color and size_final: 
             return f"{pn_final}{color}{size_final}".upper()
         else: 
-            print(f"Barcode generation skipped (missing fields): {row_data}")
             return None
             
-    except Exception as e: 
-        print(f"Error generating barcode for {row_data}: {e}")
+    except Exception: 
         return None
 
 def get_sort_key(variant, brand_settings=None):

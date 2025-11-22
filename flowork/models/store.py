@@ -7,10 +7,8 @@ class Store(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     store_name = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(50), nullable=True)
-    
     brand_id = db.Column(db.Integer, db.ForeignKey('brands.id'), nullable=False, index=True)
     brand = db.relationship('Brand', back_populates='stores')
-    
     users = db.relationship('User', back_populates='store', lazy='dynamic', foreign_keys='User.store_id')
     store_code = db.Column(db.String(100), nullable=True, index=True) 
     manager_name = db.Column(db.String(100), nullable=True) 
@@ -68,7 +66,6 @@ class Announcement(db.Model):
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now)
-    
     comments = db.relationship('Comment', backref='announcement', lazy='dynamic', cascade="all, delete-orphan")
 
 class Comment(db.Model):
@@ -78,5 +75,4 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now)
-    
     user = db.relationship('User', backref='comments')

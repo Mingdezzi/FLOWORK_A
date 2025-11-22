@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     
-    // --- 1. 고객 관리 페이지 로직 ---
     const custTbody = document.getElementById('customer-tbody');
     if (custTbody) {
         const listUrl = document.body.dataset.apiListUrl;
@@ -63,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCustomers();
     }
 
-    // --- 2. 수선 관리 페이지 로직 ---
     const repModalEl = document.getElementById('repairModal');
     if (repModalEl) {
         const repModal = new bootstrap.Modal(repModalEl);
@@ -101,12 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // 상태 변경 이벤트 (테이블 내 select)
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('status-select')) {
                 const id = e.target.dataset.id;
                 const newStatus = e.target.value;
-                const statusUrl = document.body.dataset.apiStatusUrl; // base url
+                const statusUrl = document.body.dataset.apiStatusUrl; 
                 
                 fetch(`${statusUrl}/${id}/status`, {
                     method: 'POST',
@@ -114,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ status: newStatus })
                 }).then(r => r.json()).then(data => {
                     if (data.status === 'success') {
-                        // 배지 업데이트
                         const row = e.target.closest('tr');
                         const badge = row.querySelector('.status-badge');
                         if(badge) badge.textContent = newStatus;

@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // [수정] CSRF 토큰 가져오기
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     const getToday = () => {
@@ -13,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const receptionToggles = document.getElementById('reception-method-toggles');
     const addressWrapper = document.getElementById('address-fields-wrapper');
-    const addressInputs = addressWrapper ? addressWrapper.querySelectorAll('input') : [];
     const addressRequiredText = document.getElementById('address-required-text');
 
     function toggleAddressFields() {
@@ -130,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                    'X-CSRFToken': csrfToken 
                 },
                 body: JSON.stringify({ product_number: productNumber })
             });
@@ -174,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': csrfToken 
                     },
                     body: JSON.stringify({ query: query })
                 });

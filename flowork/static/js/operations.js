@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const today = new Date().toISOString().split('T')[0];
 
-    // --- 근태 관리 로직 ---
     const attTbody = document.getElementById('att-tbody');
     if (attTbody) {
         const dateInput = document.getElementById('work-date');
@@ -72,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadAttendance();
     }
 
-    // --- 타사 매출 관리 로직 ---
     const salesTbody = document.getElementById('sales-tbody');
     if (salesTbody) {
         const dateInput = document.getElementById('sale-date');
@@ -87,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         dateInput.value = today;
 
-        // 1. 매출 로드
         function loadSales() {
             const date = dateInput.value;
             fetch(`${urlSales}?date=${date}`)
@@ -111,7 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td class="fw-bold total-cell">${total.toLocaleString()}</td>
                         `;
                         
-                        // 합계 자동 계산
                         tr.addEventListener('input', () => {
                             const v = cls => parseInt(tr.querySelector('.'+cls).value) || 0;
                             const sum = v('off-norm') + v('off-evt') + v('on-norm') + v('on-evt');
@@ -123,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
         }
 
-        // 2. 브랜드 로드
         function loadBrands() {
             fetch(urlBrand)
                 .then(r => r.json())
@@ -176,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (d.status === 'success') {
                     newBrandInput.value = '';
                     loadBrands();
-                    loadSales(); // 리스트 갱신
+                    loadSales(); 
                 } else {
                     alert(d.message);
                 }

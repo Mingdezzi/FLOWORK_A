@@ -1,12 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     
-    // UI 요소 참조
     const btnStart = document.getElementById('btn-start-process');
     const btnReset = document.getElementById('btn-reset-selection');
     const btnClearBatch = document.getElementById('btn-clear-current-batch');
     
-    // 검색 요소 (상세 검색용)
     const btnSearchExec = document.getElementById('btn-search-exec');
     const btnSearchReset = document.getElementById('btn-search-reset');
     const searchMultiCodes = document.getElementById('search-multi-codes');
@@ -14,22 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchYear = document.getElementById('search-year');
     const searchCategory = document.getElementById('search-category');
     
-    // 로고 업로드 요소
     const btnUploadLogo = document.getElementById('btn-upload-logo');
     const inputLogoFile = document.getElementById('logo-file');
 
-    // 프로그레스 바 요소
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const progressContainer = document.getElementById('progress-container');
 
-    // 모달 요소
     const imgModalEl = document.getElementById('imagePreviewModal');
     const imgModal = new bootstrap.Modal(imgModalEl);
     const folderModalEl = document.getElementById('folderViewModal');
     const folderModal = new bootstrap.Modal(folderModalEl);
     
-    // API URL 가져오기
     const bodyData = document.body.dataset;
     const API_LIST = bodyData.apiList;
     const API_PROCESS = bodyData.apiProcess;
@@ -43,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let isProcessing = false;
     let pollingInterval = null;
     
-    // 탭별 페이지네이션 상태 관리
     const paginationState = {
         'tab-current-ready': 1, 
         'tab-current-processing': 1, 
@@ -54,18 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
         'tab-hist-failed': 1
     };
 
-    // 현재 작업 중인 품번 목록 (세션 스토리지 사용)
     let currentBatchCodes = JSON.parse(sessionStorage.getItem('currentBatchCodes') || '[]');
 
-    // --- 1. 초기화 ---
     loadUserOptions();
     initEventListeners();
     
-    // 초기 로드: 현재 활성화된 탭의 데이터 호출
     const activeTabs = document.querySelectorAll('.nav-link.active');
     activeTabs.forEach(tab => loadTabContent(tab));
 
-    // --- 2. 사용자 옵션 로드 ---
     async function loadUserOptions() {
         try {
             const res = await fetch(API_OPTIONS);
@@ -85,18 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 3. 이벤트 리스너 설정 ---
     function initEventListeners() {
-        // 탭 전환 시 데이터 로드
         document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
             tab.addEventListener('shown.bs.tab', (e) => loadTabContent(e.target));
         });
 
-        // 검색 버튼 이벤트
         if (btnSearchExec) btnSearchExec.addEventListener('click', performSearch);
         if (btnSearchReset) btnSearchReset.addEventListener('click', resetSearchForm);
 
-        // 옵션 UI 동기화 (컬러 피커 <-> 텍스트 입력)
         const colorPicker = document.getElementById('opt-bgcolor-picker');
         const colorText = document.getElementById('opt-bgcolor-text');
         if (colorPicker && colorText) {
@@ -104,14 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
             colorText.addEventListener('input', (e) => { if(/^#[0-9A-F]{6}$/i.test(e.target.value)) colorPicker.value = e.target.value; });
         }
 
-        // 로고 업로드 버튼
         if (btnUploadLogo) btnUploadLogo.addEventListener('click', uploadLogo);
 
-        // 작업 제어 버튼
         if (btnStart) btnStart.addEventListener('click', startProcess);
         if (btnReset) btnReset.addEventListener('click', resetSelectionStatus);
 
-        // 현재 작업 목록 비우기 버튼
         if (currentBatchCodes.length > 0) btnClearBatch.style.display = 'block';
         if (btnClearBatch) {
             btnClearBatch.addEventListener('click', () => {
@@ -124,7 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // 전체 선택 체크박스
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('check-all')) {
                 const table = e.target.closest('table');
@@ -135,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 4. 로고 업로드 기능 ---
     async function uploadLogo() {
         const file = inputLogoFile.files[0];
         if (!file) return alert('파일을 선택해주세요.');
@@ -167,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 5. 데이터 로드 및 렌더링 ---
     function loadTabContent(tabElement) {
         const targetId = tabElement.dataset.bsTarget.substring(1); 
         const tabType = tabElement.dataset.tabType;
@@ -186,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.querySelector(`#${targetId} .table-responsive`);
         if (!container) return;
 
-        // 현재 작업 목록이 없는데 '현재 작업' 탭을 조회하는 경우
         if (scope === 'current' && currentBatchCodes.length === 0) {
             container.innerHTML = `<div class="text-center p-5 text-muted">현재 진행 중인 작업이 없습니다.</div>`;
             const badge = document.querySelector(`#${targetId.replace('tab-', 'cnt-')}`);
@@ -199,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams({ page, limit: 20, tab: tabType });
 
-            // 하단 탭: 상세 검색 조건 적용
             if (scope === 'history') {
                 const multiCodes = searchMultiCodes ? searchMultiCodes.value.trim() : '';
                 if (multiCodes) params.append('multi_codes', multiCodes); 
@@ -214,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (sCat) params.append('item_category', sCat);
             }
 
-            // 상단 탭: 현재 작업 배치 필터 적용
             if (scope === 'current') {
                 params.append('batch_codes', currentBatchCodes.join(','));
             }
@@ -262,7 +238,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusBadge = `<span class="badge bg-danger status-badge" title="${item.message}">실패</span>`;
             }
 
-            // 썸네일 및 버튼 HTML 생성
             const thumbHtml = item.thumbnail ? `<img src="${item.thumbnail}" class="img-preview" onclick="showImageModal('${item.thumbnail}')">` : `<div class="img-placeholder"><i class="bi bi-image"></i></div>`;
             const detailHtml = item.detail ? `<img src="${item.detail}" class="img-preview" onclick="showImageModal('${item.detail}')">` : `<span class="text-muted">-</span>`;
             const folderBtn = `<button class="btn btn-sm btn-outline-info" onclick="showFolderModal('${item.style_code}')"><i class="bi bi-folder"></i></button>`;
@@ -326,9 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.appendChild(ul);
     }
 
-    // --- 6. 검색 및 초기화 ---
     function performSearch() {
-        // 검색 시 '전체 이력 -> 전체 목록' 탭으로 이동
         const histAllTab = document.querySelector('button[data-bs-target="#tab-hist-all"]');
         if (histAllTab) {
             new bootstrap.Tab(histAllTab).show();
@@ -345,7 +318,6 @@ document.addEventListener('DOMContentLoaded', () => {
         performSearch();
     }
 
-    // --- 7. 작업 제어 ---
     function updateButtonState() {
         const checked = document.querySelectorAll('.item-check:checked').length;
         if (btnStart) {
@@ -380,7 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const json = await res.json();
             if (json.status === 'success') {
-                // 현재 작업 목록 업데이트
                 const newSet = new Set([...currentBatchCodes, ...styleCodes]);
                 currentBatchCodes = Array.from(newSet);
                 sessionStorage.setItem('currentBatchCodes', JSON.stringify(currentBatchCodes));
@@ -388,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(btnClearBatch) btnClearBatch.style.display = 'block';
                 startProgressPolling(json.task_id);
                 
-                // 상단 '진행중' 탭으로 이동
                 const processingTab = document.querySelector('button[data-bs-target="#tab-current-processing"]');
                 new bootstrap.Tab(processingTab).show();
                 loadTabContent(processingTab);
@@ -425,14 +395,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (task.status === 'completed') {
                         progressBar.classList.add('bg-success');
                         progressText.textContent = '완료!';
-                        // alert(task.result.message); // 완료 알림은 생략하거나 토스트 메시지로 대체 가능
                     } else {
                         progressBar.classList.add('bg-danger');
                         progressText.textContent = '오류 발생';
                         alert('작업 중 오류가 발생했습니다: ' + task.message);
                     }
                     
-                    // 잠시 후 숨김 및 목록 갱신
                     setTimeout(() => {
                         progressContainer.style.display = 'none';
                         progressBar.style.width = '0%';
@@ -462,8 +430,6 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshActiveTab();
         } catch (e) { alert('오류 발생'); }
     }
-
-    // --- 8. 전역 함수 (HTML onclick 속성에서 호출) ---
     
     window.showImageModal = (src) => {
         document.getElementById('preview-image-target').src = src;
@@ -483,21 +449,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 else {
                     let html = '';
                     json.images.forEach(img => {
-                        // 아이콘 설정
                         let iconClass = 'bi-file-earmark';
                         if (img.type === 'dir') iconClass = 'bi-folder-fill text-warning';
                         else if (img.file_type === 'processed') iconClass = 'bi-magic text-primary';
                         else if (img.file_type === 'original') iconClass = 'bi-image text-secondary';
-
-                        // 클릭 이벤트 (폴더 진입 vs 파일 보기)
-                        let clickAction = '';
-                        if (img.type === 'dir') {
-                            // 하위 폴더 진입 (현재 경로 + 폴더명)
-                            // API 호출 시 path 파라미터를 전달해야 함 (별도 함수 필요 또는 API 수정 필요)
-                            // 여기서는 단순화를 위해 현재 구조상 파일만 리스트된다고 가정하거나, 
-                            // API가 재귀적이 아닌 플랫한 리스트를 준다면 그대로 표시.
-                            // 만약 트리 구조라면 별도 로직 필요. 현재 API는 해당 품번 폴더 내 파일만 스캔함.
-                        }
 
                         html += `
                             <a href="${img.url}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center folder-item">
