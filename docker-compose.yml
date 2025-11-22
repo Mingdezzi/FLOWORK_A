@@ -16,6 +16,7 @@ services:
       - TZ=Asia/Seoul
     volumes:
       - ./flowork/static/product_images:/app/flowork/static/product_images
+      - flowork_tmp:/tmp  # [수정] 임시 파일 공유를 위한 볼륨 마운트
     depends_on:
       - db
       - redis
@@ -33,6 +34,7 @@ services:
       - TZ=Asia/Seoul
     volumes:
       - ./flowork/static/product_images:/app/flowork/static/product_images
+      - flowork_tmp:/tmp  # [수정] web 컨테이너와 동일한 볼륨을 마운트하여 파일 접근 가능하게 함
     depends_on:
       - db
       - redis
@@ -74,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+  flowork_tmp:

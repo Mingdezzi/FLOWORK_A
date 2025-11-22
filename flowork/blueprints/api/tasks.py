@@ -1,11 +1,11 @@
 from flask import jsonify
-from flowork.celery_tasks import task_process_images
-
+from flowork.extensions import celery
 from . import api_bp
 
 @api_bp.route('/api/task_status/<task_id>', methods=['GET'])
 def get_task_status(task_id):
-    task = task_process_images.AsyncResult(task_id)
+    # [수정] 특정 태스크 함수가 아닌 celery 앱 자체를 통해 AsyncResult 조회 (범용성 확보)
+    task = celery.AsyncResult(task_id)
     
     if task.state == 'PENDING':
         response = {
@@ -23,7 +23,6 @@ def get_task_status(task_id):
         }
     elif task.state == 'SUCCESS':
         result = task.result
-        # task.result가 딕셔너리 형태인지 확인
         if isinstance(result, dict):
             response = result
         else:
@@ -31,10 +30,15 @@ def get_task_status(task_id):
                 'status': 'completed',
                 'result': result
             }
-    else:
+    elif task.state == 'FAILURE':
         response = {
             'status': 'error',
             'message': str(task.info)
+        }
+    else:
+        response = {
+            'status': 'error',
+            'message': f'Task status: {task.state}'
         }
         
     return jsonify(response)
