@@ -12,6 +12,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - TZ=Asia/Seoul
+      - C_FORCE_ROOT=1
     volumes:
       - ./flowork/static/product_images:/app/flowork/static/product_images
       - flowork_tmp:/tmp
