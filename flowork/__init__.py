@@ -27,9 +27,15 @@ def create_app(config_class):
     login_manager.init_app(app)
     csrf.init_app(app)
 
-    celery.conf.update(app.config)
+    # [수정] Celery 설정을 명시적으로 매핑하여 경고 제거
     celery.conf.broker_url = app.config['CELERY_BROKER_URL']
     celery.conf.result_backend = app.config['CELERY_RESULT_BACKEND']
+    celery.conf.update(
+        accept_content=['json'],
+        task_serializer='json',
+        result_serializer='json',
+        timezone=os.environ.get('TZ', 'Asia/Seoul')
+    )
 
     class ContextTask(celery.Task):
         def __call__(self, *args, **kwargs):
