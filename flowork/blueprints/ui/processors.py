@@ -1,6 +1,7 @@
 from flask_login import current_user
 from flowork.models import Setting
 from . import ui_bp
+from datetime import date
 
 @ui_bp.app_context_processor
 def inject_image_helpers():
@@ -72,4 +73,6 @@ def inject_global_vars():
     except Exception:
         pass
     
-    return dict(shop_name=shop_name)
+    today_date = date.today().strftime('%Y-%m-%d')
+    
+    return dict(shop_name=shop_name, today_date=today_date)

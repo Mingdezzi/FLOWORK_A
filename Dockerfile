@@ -23,4 +23,4 @@ COPY . .
 
 ENV CUDA_VISIBLE_DEVICES=-1
 
-CMD gunicorn --workers 5 --threads 4 --worker-class gthread --bind 0.0.0.0:$PORT --timeout 300 --keep-alive 5 run:app
+CMD gunicorn --workers 7 --threads 4 --worker-class gthread --bind 0.0.0.0:$PORT --timeout 300 --keep-alive 5 run:app

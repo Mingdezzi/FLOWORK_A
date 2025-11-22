@@ -3,13 +3,10 @@ import numpy as np
 from openpyxl.utils import column_index_from_string
 from flowork.models import db, Product, Variant, StoreStock, Setting, Store
 from flowork.utils import clean_string_upper, get_choseong, generate_barcode
-from sqlalchemy import exc
-from sqlalchemy.orm import selectinload
 import traceback
 import json
-import io
-from datetime import datetime
-import openpyxl
+from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 try:
     from flowork.services.transformer import transform_horizontal_to_vertical
@@ -157,7 +154,7 @@ def verify_stock_excel(file_path, form, upload_mode):
 
 def import_excel_file(file, form, brand_id, progress_callback=None):
     if not file: return False, '파일이 없습니다.', 'error'
-    BATCH_SIZE = 1000
+    BATCH_SIZE = 5000  # [최적화] 12GB RAM 활용을 위해 배치 사이즈 증가
     
     is_horizontal = form.get('is_horizontal') == 'on'
     
@@ -203,12 +200,17 @@ def import_excel_file(file, form, brand_id, progress_callback=None):
         if df.empty:
             return False, "유효한 데이터가 없습니다.", 'error'
             
-        store_ids = db.session.query(Store.id).filter_by(brand_id=brand_id)
-        db.session.query(StoreStock).filter(StoreStock.store_id.in_(store_ids)).delete(synchronize_session=False)
-        product_ids = db.session.query(Product.id).filter_by(brand_id=brand_id)
-        db.session.query(Variant).filter(Variant.product_id.in_(product_ids)).delete(synchronize_session=False)
-        db.session.query(Product).filter_by(brand_id=brand_id).delete(synchronize_session=False)
-        db.session.commit()
+        # [수정] 기존 데이터 삭제 시 무결성 오류 처리 추가
+        try:
+            store_ids = db.session.query(Store.id).filter_by(brand_id=brand_id)
+            db.session.query(StoreStock).filter(StoreStock.store_id.in_(store_ids)).delete(synchronize_session=False)
+            product_ids = db.session.query(Product.id).filter_by(brand_id=brand_id)
+            db.session.query(Variant).filter(Variant.product_id.in_(product_ids)).delete(synchronize_session=False)
+            db.session.query(Product).filter_by(brand_id=brand_id).delete(synchronize_session=False)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            return False, "삭제 실패: 판매 내역이나 주문 내역에 사용 중인 상품이 있습니다. 시스템 관리에서 판매/주문 데이터를 먼저 초기화해주세요.", 'error'
 
         products_id_map = {} 
         total_products = 0
@@ -530,6 +532,9 @@ def _process_stock_update_excel(file, form, upload_mode, brand_id, target_store_
         return 0, 0, f"오류 발생: {e}", "error"
 
 def export_db_to_excel(brand_id):
+    import io
+    import openpyxl
+    from datetime import datetime
     try:
         query = db.session.query(
             Product.product_number, Product.product_name, Product.release_year, Product.item_category,
@@ -554,6 +559,9 @@ def export_db_to_excel(brand_id):
         return None, None, str(e)
 
 def export_stock_check_excel(store_id, brand_id):
+    import io
+    import openpyxl
+    from datetime import datetime
     try:
         variants = db.session.query(Variant).join(Product).filter(Product.brand_id == brand_id).all()
         stocks = db.session.query(StoreStock).filter_by(store_id=store_id).all()
