@@ -169,11 +169,25 @@
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label fw-bold small">연도</label>
-                                        <input type="number" class="form-control form-control-sm" id="search-year" placeholder="예: 2024">
+                                        <select id="search-year" class="form-select form-select-sm">
+                                            <option value="">-- 전체 --</option>
+                                            {% if filter_options and filter_options.years %}
+                                                {% for year in filter_options.years %}
+                                                <option value="{{ year }}">{{ year }}</option>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </select>
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label fw-bold small">카테고리</label>
-                                        <input type="text" class="form-control form-control-sm" id="search-category" placeholder="예: 자켓">
+                                        <select id="search-category" class="form-select form-select-sm">
+                                            <option value="">-- 전체 --</option>
+                                            {% if filter_options and filter_options.categories %}
+                                                {% for cat in filter_options.categories %}
+                                                <option value="{{ cat }}">{{ cat }}</option>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </select>
                                     </div>
                                     <div class="col-12 d-flex align-items-end justify-content-end gap-2 mt-3">
                                         <button class="btn btn-secondary btn-sm" id="btn-search-reset">초기화</button>

@@ -24,7 +24,6 @@ def get_product_image_status():
         limit = request.args.get('limit', 50, type=int)
         tab_type = request.args.get('tab', 'all')
         
-        # [수정] 다중 품번 및 상세 검색 파라미터 처리
         multi_codes_str = request.args.get('multi_codes', '')
         batch_codes_str = request.args.get('batch_codes', '')
         
@@ -45,20 +44,15 @@ def get_product_image_status():
          .filter(Product.brand_id == current_user.current_brand_id)\
          .group_by(Product.id)
 
-        # 1. 현재 작업 배치 필터링 (상단 탭용)
         if batch_codes_str:
             batch_codes = [c.strip() for c in batch_codes_str.split(',') if c.strip()]
             if batch_codes:
-                # 배치 코드로 시작하는 것 검색 (LIKE prefix)
                 conditions = [Product.product_number.like(f"{code}%") for code in batch_codes]
                 query = query.filter(or_(*conditions))
 
-        # 2. 상세 검색 필터링 (하단 탭용)
         if multi_codes_str:
-            # 줄바꿈으로 분리된 다중 품번
             codes = [c.strip() for c in multi_codes_str.split('\n') if c.strip()]
             if codes:
-                # 입력된 코드로 시작하는 품번 검색
                 conditions = [Product.product_number.like(f"{code}%") for code in codes]
                 query = query.filter(or_(*conditions))
         
@@ -71,7 +65,6 @@ def get_product_image_status():
         if search_category:
             query = query.filter(Product.item_category == search_category)
 
-        # 3. 탭 상태 필터링
         if tab_type == 'processing':
             query = query.filter(Product.image_status == 'PROCESSING')
         elif tab_type == 'ready':

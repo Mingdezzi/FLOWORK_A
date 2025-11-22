@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     
-    // UI 요소
+    // UI 요소 참조
     const btnStart = document.getElementById('btn-start-process');
     const btnReset = document.getElementById('btn-reset-selection');
     const btnClearBatch = document.getElementById('btn-clear-current-batch');
@@ -18,12 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnUploadLogo = document.getElementById('btn-upload-logo');
     const inputLogoFile = document.getElementById('logo-file');
 
-    // 프로그레스
+    // 프로그레스 바
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const progressContainer = document.getElementById('progress-container');
 
-    // 모달
+    // 모달 요소
     const imgModalEl = document.getElementById('imagePreviewModal');
     const imgModal = new bootstrap.Modal(imgModalEl);
     const folderModalEl = document.getElementById('folderViewModal');
@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadUserOptions();
     initEventListeners();
     
+    // 초기 로드: 활성화된 탭 데이터 호출
     const activeTabs = document.querySelectorAll('.nav-link.active');
     activeTabs.forEach(tab => loadTabContent(tab));
 
@@ -80,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tab.addEventListener('shown.bs.tab', (e) => loadTabContent(e.target));
         });
 
-        // 검색 버튼
+        // 검색 및 초기화
         btnSearchExec.addEventListener('click', performSearch);
         btnSearchReset.addEventListener('click', resetSearchForm);
 
@@ -99,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentBatchCodes.length > 0) btnClearBatch.style.display = 'block';
         btnClearBatch.addEventListener('click', () => {
-            if(confirm('현재 작업 목록 리스트를 비우시겠습니까?')) {
+            if(confirm('현재 작업 목록 리스트를 비우시겠습니까?\n(DB 데이터는 유지됩니다)')) {
                 currentBatchCodes = [];
                 sessionStorage.setItem('currentBatchCodes', '[]');
                 btnClearBatch.style.display = 'none';
@@ -179,15 +180,17 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams({ page, limit: 20, tab: tabType });
 
+            // 상세 검색 조건 (하단 탭)
             if (scope === 'history') {
                 const multiCodes = searchMultiCodes.value.trim();
-                if (multiCodes) params.append('multi_codes', multiCodes); // 다중 품번
+                if (multiCodes) params.append('multi_codes', multiCodes); 
                 
                 if (searchName.value.trim()) params.append('product_name', searchName.value.trim());
                 if (searchYear.value.trim()) params.append('release_year', searchYear.value.trim());
                 if (searchCategory.value.trim()) params.append('item_category', searchCategory.value.trim());
             }
 
+            // 현재 작업 필터 (상단 탭)
             if (scope === 'current') {
                 params.append('batch_codes', currentBatchCodes.join(','));
             }
@@ -296,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 검색 ---
     function performSearch() {
-        // 항상 하단 전체 목록 탭으로 이동하여 검색
+        // 하단 전체 목록 탭으로 이동하여 검색 실행
         const histAllTab = document.querySelector('button[data-bs-target="#tab-hist-all"]');
         if (histAllTab) {
             new bootstrap.Tab(histAllTab).show();
