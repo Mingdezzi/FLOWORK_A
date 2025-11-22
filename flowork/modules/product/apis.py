@@ -1,16 +1,16 @@
 import uuid
 import os
 import traceback
-from flask import request, jsonify, send_file, abort, flash, redirect, url_for
+import json
+from flask import request, jsonify, send_file, abort, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
-from sqlalchemy import or_, delete
+from sqlalchemy import or_, delete, exc
 from sqlalchemy.orm import selectinload
 
 from flowork.models import db, Product, Variant, StoreStock, Setting, StockHistory, Store
 from flowork.utils import clean_string_upper, get_choseong, generate_barcode, get_sort_key
 from flowork.modules.product import product_bp
 from flowork.modules.product.services import update_stock_quantity, update_actual_stock_quantity, toggle_product_favorite, delete_product_data
-# [수정됨] verify_stock_excel, analyze_excel_file은 excel_services에서, export_*는 export_services에서 import
 from flowork.modules.product.excel_services import verify_stock_excel
 from flowork.modules.product.export_services import export_db_to_excel, export_stock_check_excel, analyze_excel_file
 from flowork.modules.product.tasks import task_upsert_inventory, task_import_db, task_process_images
@@ -427,3 +427,126 @@ def api_trigger_image_process():
     
     task = task_process_images.delay(current_user.current_brand_id, codes, opts)
     return jsonify({'status':'success', 'task_id':task.id})
+
+@product_bp.route('/api/product/options', methods=['GET'])
+@login_required
+def api_get_user_options():
+    if not current_user.brand_id: return jsonify({'status':'error'}), 403
+    key = f'IMG_OPTS_{current_user.id}'
+    setting = Setting.query.filter_by(brand_id=current_user.current_brand_id, key=key).first()
+    if setting:
+        return jsonify({'status':'success', 'options': json.loads(setting.value)})
+    return jsonify({'status':'success', 'options': {}})
+
+@product_bp.route('/api/task_status/<task_id>', methods=['GET'])
+@login_required
+def api_get_task_status(task_id):
+    # This route checks Celery task status. Needs to import celery app or task
+    from flowork.modules.product.tasks import task_process_images, task_upsert_inventory, task_import_db
+    # Using AsyncResult from celery
+    from celery.result import AsyncResult
+    task = AsyncResult(task_id)
+    if task.state == 'PENDING':
+        response = {'status': 'pending', 'current': 0, 'total': 100, 'percent': 0}
+    elif task.state == 'PROGRESS':
+        response = {'status': 'processing', 'current': task.info.get('current', 0), 'total': task.info.get('total', 100), 'percent': task.info.get('percent', 0)}
+    elif task.state == 'SUCCESS':
+        response = {'status': 'completed', 'result': task.result}
+    else:
+        response = {'status': 'error', 'message': str(task.info)}
+    return jsonify(response)
+
+@product_bp.route('/api/product/folder/<style_code>', methods=['GET'])
+@login_required
+def api_get_folder_images(style_code):
+    brand = current_user.brand
+    if not brand: return jsonify({'status':'error'}), 403
+    
+    base_path = os.path.join(current_app.root_path, 'static', 'product_images', brand.brand_name, style_code)
+    if not os.path.exists(base_path): return jsonify({'status':'success', 'images':[]})
+    
+    images = []
+    for root, dirs, files in os.walk(base_path):
+        for file in files:
+            if file.lower().endswith(('.jpg', '.png', '.jpeg')):
+                rel_path = os.path.relpath(os.path.join(root, file), start=base_path)
+                full_url = url_for('static', filename=f'product_images/{brand.brand_name}/{style_code}/{rel_path}')
+                
+                f_type = 'original'
+                if 'NOBG' in rel_path: f_type = 'processed'
+                
+                images.append({'name': rel_path, 'url': full_url, 'type': 'file', 'file_type': f_type})
+    return jsonify({'status':'success', 'images':images})
+
+@product_bp.route('/api/product/delete_image_data', methods=['POST'])
+@login_required
+def api_delete_image_data():
+    if not current_user.brand_id: return jsonify({'status':'error'}), 403
+    codes = request.json.get('style_codes', [])
+    brand = current_user.brand
+    
+    for code in codes:
+        products = Product.query.filter_by(brand_id=brand.id).filter(Product.product_number.like(f"{code}%")).all()
+        for p in products:
+            p.image_status = 'READY'
+            p.thumbnail_url = None
+            p.detail_image_url = None
+            p.last_message = None
+        
+        dir_path = os.path.join(current_app.root_path, 'static', 'product_images', brand.brand_name, code)
+        if os.path.exists(dir_path):
+            try: shutil.rmtree(dir_path)
+            except: pass
+            
+    db.session.commit()
+    return jsonify({'status':'success', 'message':'삭제 완료'})
+
+@product_bp.route('/api/product/get_image_status', methods=['GET'])
+@login_required
+def api_get_product_image_status():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    tab = request.args.get('tab', 'ready')
+    
+    query = db.session.query(Product.product_number, Product.product_name, Product.image_status, Product.last_message, Product.thumbnail_url, Product.detail_image_url)\
+        .filter(Product.brand_id==current_user.current_brand_id)
+    
+    # Group by style code (first 6-7 chars usually, but here we might need logic. Assuming products are individual variants or grouped)
+    # This part depends on how 'style_code' is defined. Let's assume product_number is the key.
+    
+    # Filtering logic based on tab
+    if tab == 'ready': query = query.filter(Product.image_status == 'READY')
+    elif tab == 'processing': query = query.filter(Product.image_status == 'PROCESSING')
+    elif tab == 'completed': query = query.filter(Product.image_status == 'COMPLETED')
+    elif tab == 'failed': query = query.filter(Product.image_status == 'FAILED')
+    
+    # Advanced search filters
+    p_name = request.args.get('product_name')
+    if p_name: query = query.filter(Product.product_name.like(f"%{p_name}%"))
+    
+    total_items = query.count()
+    items = query.order_by(Product.product_number).paginate(page=page, per_page=limit, error_out=False).items
+    
+    data = []
+    for i in items:
+        data.append({
+            'style_code': i.product_number,
+            'product_name': i.product_name,
+            'status': i.image_status,
+            'message': i.last_message,
+            'thumbnail': i.thumbnail_url,
+            'detail': i.detail_image_url,
+            'total_colors': 1 # Simplification
+        })
+        
+    return jsonify({
+        'status': 'success',
+        'data': data,
+        'pagination': {
+            'total_items': total_items,
+            'total_pages': (total_items + limit - 1) // limit,
+            'current_page': page,
+            'has_next': page * limit < total_items,
+            'has_prev': page > 1
+        }
+    })

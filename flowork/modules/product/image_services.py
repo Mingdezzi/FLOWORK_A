@@ -23,6 +23,23 @@ def _hex_to_rgb(hex_value):
     hex_value = hex_value.lstrip('#')
     return tuple(int(hex_value[i:i+2], 16) for i in (0, 2, 4))
 
+def save_options_logic(user_id, brand_id, options):
+    """사용자가 선택한 이미지 처리 옵션(배경색, 여백 등)을 DB에 저장"""
+    try:
+        key = f'IMG_OPTS_{user_id}'
+        val = json.dumps(options)
+        setting = Setting.query.filter_by(brand_id=brand_id, key=key).first()
+        if setting:
+            setting.value = val
+        else:
+            setting = Setting(brand_id=brand_id, key=key, value=val)
+            db.session.add(setting)
+        db.session.commit()
+        return True
+    except Exception as e:
+        print(f"Option Save Error: {e}")
+        return False
+
 def process_style_code_group(brand_id, style_code, options=None):
     products = []
     try:
