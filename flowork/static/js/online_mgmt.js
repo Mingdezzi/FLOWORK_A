@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnReset = document.getElementById('btn-reset-selection');
     const btnClearBatch = document.getElementById('btn-clear-current-batch');
     
-    // 검색 요소
+    // 검색 요소 (상세 검색용)
     const btnSearchExec = document.getElementById('btn-search-exec');
     const btnSearchReset = document.getElementById('btn-search-reset');
     const searchMultiCodes = document.getElementById('search-multi-codes');
@@ -14,11 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchYear = document.getElementById('search-year');
     const searchCategory = document.getElementById('search-category');
     
-    // 로고 업로드
+    // 로고 업로드 요소
     const btnUploadLogo = document.getElementById('btn-upload-logo');
     const inputLogoFile = document.getElementById('logo-file');
 
-    // 프로그레스 바
+    // 프로그레스 바 요소
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const progressContainer = document.getElementById('progress-container');
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const folderModalEl = document.getElementById('folderViewModal');
     const folderModal = new bootstrap.Modal(folderModalEl);
     
-    // API URL
+    // API URL 가져오기
     const bodyData = document.body.dataset;
     const API_LIST = bodyData.apiList;
     const API_PROCESS = bodyData.apiProcess;
@@ -43,22 +43,29 @@ document.addEventListener('DOMContentLoaded', () => {
     let isProcessing = false;
     let pollingInterval = null;
     
+    // 탭별 페이지네이션 상태 관리
     const paginationState = {
-        'tab-current-ready': 1, 'tab-current-processing': 1, 'tab-current-completed': 1, 'tab-current-failed': 1,
-        'tab-hist-all': 1, 'tab-hist-completed': 1, 'tab-hist-failed': 1
+        'tab-current-ready': 1, 
+        'tab-current-processing': 1, 
+        'tab-current-completed': 1, 
+        'tab-current-failed': 1,
+        'tab-hist-all': 1, 
+        'tab-hist-completed': 1, 
+        'tab-hist-failed': 1
     };
 
-    // 현재 작업 세션 스토리지
+    // 현재 작업 중인 품번 목록 (세션 스토리지 사용)
     let currentBatchCodes = JSON.parse(sessionStorage.getItem('currentBatchCodes') || '[]');
 
-    // --- 초기화 ---
+    // --- 1. 초기화 ---
     loadUserOptions();
     initEventListeners();
     
-    // 초기 로드: 활성화된 탭 데이터 호출
+    // 초기 로드: 현재 활성화된 탭의 데이터 호출
     const activeTabs = document.querySelectorAll('.nav-link.active');
     activeTabs.forEach(tab => loadTabContent(tab));
 
+    // --- 2. 사용자 옵션 로드 ---
     async function loadUserOptions() {
         try {
             const res = await fetch(API_OPTIONS);
@@ -73,41 +80,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if(opts.logo_align) document.getElementById('opt-logo-align').value = opts.logo_align;
             }
-        } catch (e) { console.error("옵션 로드 실패:", e); }
+        } catch (e) { 
+            console.error("옵션 로드 실패:", e); 
+        }
     }
 
+    // --- 3. 이벤트 리스너 설정 ---
     function initEventListeners() {
+        // 탭 전환 시 데이터 로드
         document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
             tab.addEventListener('shown.bs.tab', (e) => loadTabContent(e.target));
         });
 
-        // 검색 및 초기화
-        btnSearchExec.addEventListener('click', performSearch);
-        btnSearchReset.addEventListener('click', resetSearchForm);
+        // 검색 버튼 이벤트
+        if (btnSearchExec) btnSearchExec.addEventListener('click', performSearch);
+        if (btnSearchReset) btnSearchReset.addEventListener('click', resetSearchForm);
 
-        // 옵션 UI 동기화
+        // 옵션 UI 동기화 (컬러 피커 <-> 텍스트 입력)
         const colorPicker = document.getElementById('opt-bgcolor-picker');
         const colorText = document.getElementById('opt-bgcolor-text');
-        colorPicker.addEventListener('input', (e) => { colorText.value = e.target.value.toUpperCase(); });
-        colorText.addEventListener('input', (e) => { if(/^#[0-9A-F]{6}$/i.test(e.target.value)) colorPicker.value = e.target.value; });
+        if (colorPicker && colorText) {
+            colorPicker.addEventListener('input', (e) => { colorText.value = e.target.value.toUpperCase(); });
+            colorText.addEventListener('input', (e) => { if(/^#[0-9A-F]{6}$/i.test(e.target.value)) colorPicker.value = e.target.value; });
+        }
 
-        // 로고 업로드
-        btnUploadLogo.addEventListener('click', uploadLogo);
+        // 로고 업로드 버튼
+        if (btnUploadLogo) btnUploadLogo.addEventListener('click', uploadLogo);
 
-        // 작업 제어
-        btnStart.addEventListener('click', startProcess);
-        btnReset.addEventListener('click', resetSelectionStatus);
+        // 작업 제어 버튼
+        if (btnStart) btnStart.addEventListener('click', startProcess);
+        if (btnReset) btnReset.addEventListener('click', resetSelectionStatus);
 
+        // 현재 작업 목록 비우기 버튼
         if (currentBatchCodes.length > 0) btnClearBatch.style.display = 'block';
-        btnClearBatch.addEventListener('click', () => {
-            if(confirm('현재 작업 목록 리스트를 비우시겠습니까?\n(DB 데이터는 유지됩니다)')) {
-                currentBatchCodes = [];
-                sessionStorage.setItem('currentBatchCodes', '[]');
-                btnClearBatch.style.display = 'none';
-                refreshActiveTab('current');
-            }
-        });
+        if (btnClearBatch) {
+            btnClearBatch.addEventListener('click', () => {
+                if(confirm('현재 작업 목록 리스트를 비우시겠습니까?\n(실제 데이터는 삭제되지 않으며, 목록에서만 제거됩니다)')) {
+                    currentBatchCodes = [];
+                    sessionStorage.setItem('currentBatchCodes', '[]');
+                    btnClearBatch.style.display = 'none';
+                    refreshActiveTab('current');
+                }
+            });
+        }
 
+        // 전체 선택 체크박스
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('check-all')) {
                 const table = e.target.closest('table');
@@ -118,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- 로고 업로드 ---
+    // --- 4. 로고 업로드 기능 ---
     async function uploadLogo() {
         const file = inputLogoFile.files[0];
         if (!file) return alert('파일을 선택해주세요.');
@@ -150,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 데이터 로드 ---
+    // --- 5. 데이터 로드 및 렌더링 ---
     function loadTabContent(tabElement) {
         const targetId = tabElement.dataset.bsTarget.substring(1); 
         const tabType = tabElement.dataset.tabType;
@@ -169,9 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.querySelector(`#${targetId} .table-responsive`);
         if (!container) return;
 
+        // 현재 작업 목록이 없는데 '현재 작업' 탭을 조회하는 경우
         if (scope === 'current' && currentBatchCodes.length === 0) {
             container.innerHTML = `<div class="text-center p-5 text-muted">현재 진행 중인 작업이 없습니다.</div>`;
-            document.querySelector(`#${targetId.replace('tab-', 'cnt-')}`).textContent = '0';
+            const badge = document.querySelector(`#${targetId.replace('tab-', 'cnt-')}`);
+            if (badge) badge.textContent = '0';
             return;
         }
 
@@ -180,17 +199,22 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams({ page, limit: 20, tab: tabType });
 
-            // 상세 검색 조건 (하단 탭)
+            // 하단 탭: 상세 검색 조건 적용
             if (scope === 'history') {
-                const multiCodes = searchMultiCodes.value.trim();
+                const multiCodes = searchMultiCodes ? searchMultiCodes.value.trim() : '';
                 if (multiCodes) params.append('multi_codes', multiCodes); 
                 
-                if (searchName.value.trim()) params.append('product_name', searchName.value.trim());
-                if (searchYear.value.trim()) params.append('release_year', searchYear.value.trim());
-                if (searchCategory.value.trim()) params.append('item_category', searchCategory.value.trim());
+                const sName = searchName ? searchName.value.trim() : '';
+                if (sName) params.append('product_name', sName);
+                
+                const sYear = searchYear ? searchYear.value.trim() : '';
+                if (sYear) params.append('release_year', sYear);
+                
+                const sCat = searchCategory ? searchCategory.value.trim() : '';
+                if (sCat) params.append('item_category', sCat);
             }
 
-            // 현재 작업 필터 (상단 탭)
+            // 상단 탭: 현재 작업 배치 필터 적용
             if (scope === 'current') {
                 params.append('batch_codes', currentBatchCodes.join(','));
             }
@@ -207,7 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.innerHTML = `<div class="text-danger p-5">${json.message}</div>`;
             }
         } catch (e) {
-            container.innerHTML = `<div class="text-danger p-5">오류 발생</div>`;
+            console.error("Data Load Error:", e);
+            container.innerHTML = `<div class="text-danger p-5">데이터 로드 중 오류가 발생했습니다.</div>`;
         }
     }
 
@@ -231,9 +256,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item.status === 'PROCESSING') {
                 statusBadge = `<span class="badge bg-primary status-badge">진행중</span>`;
                 disabled = 'disabled';
-            } else if (item.status === 'COMPLETED') statusBadge = `<span class="badge bg-success status-badge">완료</span>`;
-            else if (item.status === 'FAILED') statusBadge = `<span class="badge bg-danger status-badge" title="${item.message}">실패</span>`;
+            } else if (item.status === 'COMPLETED') {
+                statusBadge = `<span class="badge bg-success status-badge">완료</span>`;
+            } else if (item.status === 'FAILED') {
+                statusBadge = `<span class="badge bg-danger status-badge" title="${item.message}">실패</span>`;
+            }
 
+            // 썸네일 및 버튼 HTML 생성
             const thumbHtml = item.thumbnail ? `<img src="${item.thumbnail}" class="img-preview" onclick="showImageModal('${item.thumbnail}')">` : `<div class="img-placeholder"><i class="bi bi-image"></i></div>`;
             const detailHtml = item.detail ? `<img src="${item.detail}" class="img-preview" onclick="showImageModal('${item.detail}')">` : `<span class="text-muted">-</span>`;
             const folderBtn = `<button class="btn btn-sm btn-outline-info" onclick="showFolderModal('${item.style_code}')"><i class="bi bi-folder"></i></button>`;
@@ -297,9 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.appendChild(ul);
     }
 
-    // --- 검색 ---
+    // --- 6. 검색 및 초기화 ---
     function performSearch() {
-        // 하단 전체 목록 탭으로 이동하여 검색 실행
+        // 검색 시 '전체 이력 -> 전체 목록' 탭으로 이동
         const histAllTab = document.querySelector('button[data-bs-target="#tab-hist-all"]');
         if (histAllTab) {
             new bootstrap.Tab(histAllTab).show();
@@ -309,19 +338,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetSearchForm() {
-        searchMultiCodes.value = '';
-        searchName.value = '';
-        searchYear.value = '';
-        searchCategory.value = '';
+        if(searchMultiCodes) searchMultiCodes.value = '';
+        if(searchName) searchName.value = '';
+        if(searchYear) searchYear.value = '';
+        if(searchCategory) searchCategory.value = '';
         performSearch();
     }
 
-    // --- 작업 실행 ---
+    // --- 7. 작업 제어 ---
     function updateButtonState() {
         const checked = document.querySelectorAll('.item-check:checked').length;
-        btnStart.disabled = checked === 0;
-        btnStart.innerHTML = checked > 0 ? `<i class="bi bi-play-fill me-1"></i> ${checked}건 처리 시작` : `<i class="bi bi-play-fill me-1"></i> 처리 시작`;
-        btnReset.disabled = checked === 0;
+        if (btnStart) {
+            btnStart.disabled = checked === 0;
+            btnStart.innerHTML = checked > 0 ? `<i class="bi bi-play-fill me-1"></i> ${checked}건 처리 시작` : `<i class="bi bi-play-fill me-1"></i> 처리 시작`;
+        }
+        if (btnReset) {
+            btnReset.disabled = checked === 0;
+        }
     }
 
     async function startProcess() {
@@ -336,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logo_align: document.getElementById('opt-logo-align').value
         };
 
-        if (!confirm(`${styleCodes.length}건의 처리를 시작하시겠습니까?`)) return;
+        if (!confirm(`${styleCodes.length}건의 이미지 처리를 시작하시겠습니까?`)) return;
 
         btnStart.disabled = true;
         try {
@@ -347,13 +380,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const json = await res.json();
             if (json.status === 'success') {
+                // 현재 작업 목록 업데이트
                 const newSet = new Set([...currentBatchCodes, ...styleCodes]);
                 currentBatchCodes = Array.from(newSet);
                 sessionStorage.setItem('currentBatchCodes', JSON.stringify(currentBatchCodes));
                 
-                btnClearBatch.style.display = 'block';
+                if(btnClearBatch) btnClearBatch.style.display = 'block';
                 startProgressPolling(json.task_id);
                 
+                // 상단 '진행중' 탭으로 이동
                 const processingTab = document.querySelector('button[data-bs-target="#tab-current-processing"]');
                 new bootstrap.Tab(processingTab).show();
                 loadTabContent(processingTab);
@@ -362,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnStart.disabled = false;
             }
         } catch (e) {
-            alert('작업 요청 오류');
+            alert('작업 요청 중 오류가 발생했습니다.');
             btnStart.disabled = false;
         }
     }
@@ -390,13 +425,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (task.status === 'completed') {
                         progressBar.classList.add('bg-success');
                         progressText.textContent = '완료!';
-                        alert(task.result.message);
+                        // alert(task.result.message); // 완료 알림은 생략하거나 토스트 메시지로 대체 가능
                     } else {
                         progressBar.classList.add('bg-danger');
                         progressText.textContent = '오류 발생';
-                        alert('작업 오류: ' + task.message);
+                        alert('작업 중 오류가 발생했습니다: ' + task.message);
                     }
                     
+                    // 잠시 후 숨김 및 목록 갱신
                     setTimeout(() => {
                         progressContainer.style.display = 'none';
                         progressBar.style.width = '0%';
@@ -427,14 +463,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert('오류 발생'); }
     }
 
-    // --- 전역 함수 (HTML 인라인 호출용) ---
+    // --- 8. 전역 함수 (HTML onclick 속성에서 호출) ---
+    
     window.showImageModal = (src) => {
         document.getElementById('preview-image-target').src = src;
         imgModal.show();
     };
 
     window.showFolderModal = async (styleCode) => {
-        const container = document.querySelector('#folderViewModal .modal-body');
+        const container = document.querySelector('#folderViewModal .modal-body .list-group');
         container.innerHTML = '<div class="text-center"><div class="spinner-border"></div></div>';
         folderModal.show();
 
@@ -442,26 +479,46 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`${API_FOLDER}${styleCode}`);
             const json = await res.json();
             if (json.status === 'success') {
-                if (json.images.length === 0) container.innerHTML = '<div class="text-center p-3 text-muted">이미지 없음</div>';
+                if (json.images.length === 0) container.innerHTML = '<div class="text-center p-3 text-muted">폴더가 비어있거나 존재하지 않습니다.</div>';
                 else {
-                    let html = `<div class="list-group list-group-flush">`;
+                    let html = '';
                     json.images.forEach(img => {
-                        let icon = img.type === 'processed' ? '<i class="bi bi-magic text-primary me-2"></i>' : '<i class="bi bi-image me-2"></i>';
-                        html += `<a href="${img.path}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">${icon} ${img.name}</a>`;
+                        // 아이콘 설정
+                        let iconClass = 'bi-file-earmark';
+                        if (img.type === 'dir') iconClass = 'bi-folder-fill text-warning';
+                        else if (img.file_type === 'processed') iconClass = 'bi-magic text-primary';
+                        else if (img.file_type === 'original') iconClass = 'bi-image text-secondary';
+
+                        // 클릭 이벤트 (폴더 진입 vs 파일 보기)
+                        let clickAction = '';
+                        if (img.type === 'dir') {
+                            // 하위 폴더 진입 (현재 경로 + 폴더명)
+                            // API 호출 시 path 파라미터를 전달해야 함 (별도 함수 필요 또는 API 수정 필요)
+                            // 여기서는 단순화를 위해 현재 구조상 파일만 리스트된다고 가정하거나, 
+                            // API가 재귀적이 아닌 플랫한 리스트를 준다면 그대로 표시.
+                            // 만약 트리 구조라면 별도 로직 필요. 현재 API는 해당 품번 폴더 내 파일만 스캔함.
+                        }
+
+                        html += `
+                            <a href="${img.url}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center folder-item">
+                                <i class="bi ${iconClass} me-3 fs-5"></i>
+                                <div>
+                                    <div class="fw-bold">${img.name}</div>
+                                </div>
+                            </a>`;
                     });
-                    html += '</div>';
                     container.innerHTML = html;
                 }
             } else {
                 container.innerHTML = `<div class="alert alert-danger">${json.message}</div>`;
             }
-        } catch (e) { container.innerHTML = `<div class="alert alert-danger">오류</div>`; }
+        } catch (e) { container.innerHTML = `<div class="alert alert-danger">오류 발생</div>`; }
     };
 
     window.downloadImages = (styleCode) => { window.location.href = `${API_DOWNLOAD}${styleCode}`; };
 
     window.deleteImages = async (styleCode) => {
-        if (!confirm(`[${styleCode}]의 이미지와 데이터를 삭제하시겠습니까?`)) return;
+        if (!confirm(`[${styleCode}]의 이미지 데이터와 파일을 모두 삭제하시겠습니까?`)) return;
         try {
             const res = await fetch(API_DELETE, {
                 method: 'POST',
@@ -471,6 +528,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const json = await res.json();
             alert(json.message);
             refreshActiveTab();
-        } catch (e) { alert('삭제 오류'); }
+        } catch (e) { alert('삭제 중 오류가 발생했습니다.'); }
     };
 });

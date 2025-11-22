@@ -196,23 +196,48 @@ def get_product_folder_images(style_code):
         brand_name = current_user.brand.brand_name
         base_path = os.path.join(current_app.root_path, 'static', 'product_images', brand_name, style_code)
         
-        if not os.path.exists(base_path):
+        sub_path = request.args.get('path', '').strip('/')
+        
+        if '..' in sub_path or sub_path.startswith('/'):
+            sub_path = ''
+            
+        target_dir = os.path.join(base_path, sub_path)
+        
+        if not os.path.exists(target_dir):
             return jsonify({'status': 'error', 'message': '폴더를 찾을 수 없습니다.'}), 404
             
-        images = []
-        for root, dirs, files in os.walk(base_path):
-            for file in files:
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    full_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(full_path, current_app.root_path)
-                    web_path = '/' + rel_path.replace('\\', '/')
-                    images.append({
-                        'name': file,
-                        'path': web_path,
-                        'type': 'processed' if '_nobg' in file else 'original'
+        items = []
+        with os.scandir(target_dir) as entries:
+            for entry in entries:
+                if entry.is_dir():
+                    items.append({
+                        'name': entry.name,
+                        'type': 'dir',
+                        'path': os.path.join(sub_path, entry.name).replace('\\', '/')
                     })
-                    
-        return jsonify({'status': 'success', 'images': images})
+                elif entry.is_file():
+                    if entry.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        rel_path = os.path.relpath(entry.path, current_app.root_path)
+                        web_path = '/' + rel_path.replace('\\', '/')
+                        
+                        file_type = 'processed' if '_nobg' in entry.name or '_thumb' in entry.name or '_detail' in entry.name else 'original'
+                        
+                        items.append({
+                            'name': entry.name,
+                            'type': 'file',
+                            'file_type': file_type,
+                            'url': web_path
+                        })
+        
+        items.sort(key=lambda x: (0 if x['type']=='dir' else 1, x['name']))
+        
+        current_path_display = sub_path if sub_path else '/'
+        
+        return jsonify({
+            'status': 'success', 
+            'current_path': current_path_display,
+            'items': items
+        })
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
