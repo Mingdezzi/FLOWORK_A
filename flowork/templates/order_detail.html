@@ -5,6 +5,7 @@
     <title>주문상세</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 </head>
 <body data-product-lookup-url="{{ url_for('product.api_find_details') }}" 
       data-product-search-url="{{ url_for('product.api_order_search') }}">

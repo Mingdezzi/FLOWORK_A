@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import json
+import traceback
 from openpyxl.utils import column_index_from_string
 from sqlalchemy.orm import selectinload
 from flowork.models import db, Product, Variant, StoreStock, Setting, Store
@@ -109,7 +110,7 @@ def _transform_horizontal(file, settings, indices):
     
     if '기타' in size_map_conf:
         others = pd.DataFrame([{'Size_Code': str(c), 'Real_Size_Other': str(v)} for c, v in size_map_conf['기타'].items()])
-        final = final.merge(others, on='Size_Code', how='left')
+        final = final.merge(others, on=['Size_Code'], how='left')
         final['Real_Size'] = final['Real_Size'].fillna(final['Real_Size_Other'])
         
     final = final.dropna(subset=['Real_Size'])
@@ -119,9 +120,7 @@ def _transform_horizontal(file, settings, indices):
     return final[['product_number', 'product_name', 'color', 'size', 'hq_stock', 'sale_price', 'original_price', 'item_category', 'release_year']]
 
 def verify_stock_excel(file_path, form, upload_mode):
-    """엑셀 파일 검증 로직 (apis.py에서 호출됨)"""
     try:
-        # 검증 시에는 품번 열만 확인
         field_map = {'product_number': ('col_pn', True)}
         column_map_indices = _get_column_indices(form, field_map)
         
@@ -136,7 +135,6 @@ def verify_stock_excel(file_path, form, upload_mode):
         
         for _, row in df.iterrows():
             pn = row.get('product_number')
-            # 품번이 없거나 비어있으면 의심 행으로 간주
             if pd.isna(pn) or str(pn).strip() == "":
                 suspicious_rows.append({
                     'row_index': int(row['_row_index']), 
@@ -149,7 +147,7 @@ def verify_stock_excel(file_path, form, upload_mode):
     except Exception as e:
         return {'status': 'error', 'message': f"검증 중 오류: {e}"}
 
-def process_stock_upsert(file, form, mode, brand_id, store_id=None, callback=None, allow_create=True):
+def process_stock_upsert(file, form, mode, brand_id, store_id=None, callback=None, allow_create=True, excluded_rows=None):
     try:
         settings = {s.key: s.value for s in Setting.query.filter_by(brand_id=brand_id).all()}
         is_horiz = form.get('is_horizontal') == 'on'
@@ -175,6 +173,9 @@ def process_stock_upsert(file, form, mode, brand_id, store_id=None, callback=Non
             if mode == 'store' and 'hq_stock' in df: df.rename(columns={'hq_stock': 'store_stock'}, inplace=True)
         else:
             df = _read_excel(file, indices)
+            if excluded_rows:
+                drop_indices = [r - 2 for r in excluded_rows]
+                df = df.drop(index=drop_indices, errors='ignore')
             
         df = _optimize_df(df, settings, mode)
         if df.empty: return 0, 0, "유효 데이터 없음", "warning"

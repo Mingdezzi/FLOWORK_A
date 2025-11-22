@@ -72,8 +72,13 @@
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between">
                 <h2 class="mb-0">재고</h2>
+                <div class="actual-stock-control">
+                    <button id="toggle-actual-stock-btn" class="btn btn-sm btn-secondary me-2" style="display:none;">
+                        <i class="bi bi-pencil-square me-1"></i> 실사재고 등록
+                    </button>
+                </div>
                 {% if all_stores %}
-                <select class="form-select" id="hq-store-selector">
+                <select class="form-select" id="hq-store-selector" style="width:auto;">
                     <option value="0">선택</option>
                     {% for s in all_stores %}
                     <option value="{{ s.id }}" {{ 'selected' if s.id==my_store_id else '' }}>{{ s.store_name }}</option>
@@ -89,8 +94,8 @@
                             <th>사이즈</th>
                             <th>매장</th>
                             <th>본사</th>
-                            <th>실사</th>
-                            <th>차이</th>
+                            <th class="view-field">실사</th>
+                            <th class="view-field">차이</th>
                             <th class="edit-field"></th>
                         </tr>
                     </thead>
@@ -104,23 +109,39 @@
         <tr data-barcode="__BARCODE__" data-variant-id="__VARIANT_ID__">
             <td>__COLOR__</td>
             <td>__SIZE__</td>
-            <td><span id="stock-__BARCODE__">__STORE_QTY__</span></td>
-            <td>__HQ_QTY__</td>
-            <td><input type="number" class="actual-stock-input" value="__ACTUAL_QTY_VAL__"></td>
-            <td>__DIFF_VAL__</td>
-            <td></td>
+            <td>
+                <div class="d-flex align-items-center justify-content-center">
+                    <span id="stock-__BARCODE__" class="me-2 stock-quantity __STORE_QTY_CLASS__">__STORE_QTY__</span>
+                    <div class="button-stack d-inline-flex flex-column ms-1 stock-control __SHOW_IF_MY_STORE__">
+                        <button class="btn btn-sm btn-outline-secondary btn-inc py-0 px-1 mb-1" style="line-height:1;" data-change="1" data-barcode="__BARCODE__">+</button>
+                        <button class="btn btn-sm btn-outline-secondary btn-dec py-0 px-1" style="line-height:1;" data-change="-1" data-barcode="__BARCODE__">-</button>
+                    </div>
+                </div>
+            </td>
+            <td class="stock-hq __HQ_QTY_CLASS__">__HQ_QTY__</td>
+            <td class="view-field">
+                <div class="d-flex align-items-center justify-content-center __SHOW_IF_MY_STORE__">
+                    <input type="number" class="form-control actual-stock-input" id="actual-__BARCODE__" data-barcode="__BARCODE__" value="__ACTUAL_QTY_VAL__" disabled>
+                    <button class="btn btn-primary btn-save-actual" data-barcode="__BARCODE__" disabled>저장</button>
+                </div>
+                <span class="__SHOW_IF_NOT_MY_STORE__">__ACTUAL_QTY_VAL__</span>
+            </td>
+            <td class="view-field"><span id="diff-__BARCODE__" class="stock-diff badge __DIFF_CLASS__">__DIFF_VAL__</span></td>
+            <td class="edit-field">
+                <button class="btn btn-danger btn-sm btn-delete-variant"><i class="bi bi-trash-fill"></i></button>
+            </td>
         </tr>
     </template>
 
     <template id="add-variant-row-template">
-        <tr>
-            <td><input type="text" data-field="new-color"></td>
-            <td><input type="text" data-field="new-size"></td>
+        <tr id="add-variant-row">
+            <td><input type="text" class="form-control form-control-sm" data-field="new-color" placeholder="컬러"></td>
+            <td><input type="text" class="form-control form-control-sm" data-field="new-size" placeholder="사이즈"></td>
             <td></td>
             <td></td>
-            <td></td>
-            <td></td>
-            <td><button id="btn-add-variant">추가</button></td>
+            <td class="view-field"></td>
+            <td class="view-field"></td>
+            <td><button class="btn btn-success btn-sm" id="btn-add-variant"><i class="bi bi-plus-lg"></i> 추가</button></td>
         </tr>
     </template>
 

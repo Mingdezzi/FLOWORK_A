@@ -1,14 +1,13 @@
 import io
 import os
 import json
-from datetime import datetime
+import holidays
+from datetime import datetime, date
 from flask import request, jsonify, send_file, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user, logout_user
 from flowork.modules.admin import admin_bp
 from flowork.modules.admin.services import *
 from flowork.models import Setting, db, Store, ScheduleEvent
-
-# --- 브랜드/설정 관련 ---
 
 @admin_bp.route('/api/setting/brand_name', methods=['POST'])
 @login_required
@@ -46,12 +45,22 @@ def api_upload_logo():
     if not current_user.brand_id or current_user.store_id: return jsonify({'status':'error'}), 403
     f = request.files.get('logo_file')
     if not f: return jsonify({'status':'error'}), 400
-    path = os.path.join(current_app.root_path, 'static', 'logo.png')
+    path = os.path.join(current_app.root_path, 'static', 'thumbnail_logo.png')
     f.save(path)
     return jsonify({'status':'success', 'message':'로고 저장 완료'})
 
-
-# --- 매장 관리 ---
+@admin_bp.route('/api/holidays', methods=['GET'])
+def api_get_holidays():
+    kr_holidays = holidays.KR()
+    today = date.today()
+    
+    holiday_data = {}
+    for year in [today.year, today.year + 1]:
+        for date_obj, name in kr_holidays.items():
+            if date_obj.year == year:
+                holiday_data[date_obj.strftime('%Y-%m-%d')] = name
+                
+    return jsonify(holiday_data)
 
 @admin_bp.route('/api/stores', methods=['GET'])
 @login_required
@@ -115,9 +124,6 @@ def api_reset_store(sid):
     if ok: return jsonify({'status':'success', 'message':msg})
     return jsonify({'status':'error', 'message':msg}), 500
 
-
-# --- 직원 관리 ---
-
 @admin_bp.route('/api/staff', methods=['POST'])
 @login_required
 def api_add_staff():
@@ -141,9 +147,6 @@ def api_delete_staff(sid):
     ok, msg, _ = manage_staff_service('delete', current_user.store_id, None, sid)
     if ok: return jsonify({'status':'success', 'message':msg})
     return jsonify({'status':'error', 'message':msg}), 500
-
-
-# --- 유지보수 (Export/Import/Reset) ---
 
 @admin_bp.route('/api/maintenance/export_stores', methods=['GET'])
 @login_required
@@ -174,9 +177,6 @@ def api_reset_system():
     ok, msg = reset_all_system_db()
     flash(msg, 'success' if ok else 'error')
     return redirect(url_for('admin.setting_page'))
-
-
-# --- 일정 관리 (Schedule) - [신규 추가] ---
 
 @admin_bp.route('/api/schedule/events', methods=['GET'])
 @login_required

@@ -2,6 +2,7 @@ import uuid
 import os
 import traceback
 import json
+import shutil
 from flask import request, jsonify, send_file, abort, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import or_, delete, exc
@@ -76,7 +77,7 @@ def api_export_db():
     output, name, err = export_db_to_excel(current_user.current_brand_id)
     if err:
         flash(err, 'warning')
-        return redirect(url_for('ui.setting_page'))
+        return redirect(url_for('admin.setting_page'))
     return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=name)
 
 @product_bp.route('/export_stock_check')
@@ -441,9 +442,6 @@ def api_get_user_options():
 @product_bp.route('/api/task_status/<task_id>', methods=['GET'])
 @login_required
 def api_get_task_status(task_id):
-    # This route checks Celery task status. Needs to import celery app or task
-    from flowork.modules.product.tasks import task_process_images, task_upsert_inventory, task_import_db
-    # Using AsyncResult from celery
     from celery.result import AsyncResult
     task = AsyncResult(task_id)
     if task.state == 'PENDING':
@@ -508,21 +506,26 @@ def api_get_product_image_status():
     limit = request.args.get('limit', 20, type=int)
     tab = request.args.get('tab', 'ready')
     
+    p_name = request.args.get('product_name')
+    multi_codes = request.args.get('multi_codes')
+    rel_year = request.args.get('release_year')
+    item_cat = request.args.get('item_category')
+    
     query = db.session.query(Product.product_number, Product.product_name, Product.image_status, Product.last_message, Product.thumbnail_url, Product.detail_image_url)\
         .filter(Product.brand_id==current_user.current_brand_id)
     
-    # Group by style code (first 6-7 chars usually, but here we might need logic. Assuming products are individual variants or grouped)
-    # This part depends on how 'style_code' is defined. Let's assume product_number is the key.
-    
-    # Filtering logic based on tab
     if tab == 'ready': query = query.filter(Product.image_status == 'READY')
     elif tab == 'processing': query = query.filter(Product.image_status == 'PROCESSING')
     elif tab == 'completed': query = query.filter(Product.image_status == 'COMPLETED')
     elif tab == 'failed': query = query.filter(Product.image_status == 'FAILED')
     
-    # Advanced search filters
-    p_name = request.args.get('product_name')
     if p_name: query = query.filter(Product.product_name.like(f"%{p_name}%"))
+    if rel_year: query = query.filter(Product.release_year == int(rel_year))
+    if item_cat and item_cat != '전체': query = query.filter(Product.item_category == item_cat)
+    if multi_codes:
+        codes_list = [c.strip() for c in multi_codes.splitlines() if c.strip()]
+        if codes_list:
+            query = query.filter(Product.product_number.in_(codes_list))
     
     total_items = query.count()
     items = query.order_by(Product.product_number).paginate(page=page, per_page=limit, error_out=False).items
@@ -536,7 +539,7 @@ def api_get_product_image_status():
             'message': i.last_message,
             'thumbnail': i.thumbnail_url,
             'detail': i.detail_image_url,
-            'total_colors': 1 # Simplification
+            'total_colors': 1 
         })
         
     return jsonify({
