@@ -20,7 +20,7 @@ def _read_excel(file, indices):
     if hasattr(file, 'seek'): file.seek(0)
     try: df = pd.read_excel(file, header=0)
     except: 
-        file.seek(0)
+        if hasattr(file, 'seek'): file.seek(0)
         df = pd.read_csv(file)
     
     if df.empty: return pd.DataFrame()
@@ -71,10 +71,15 @@ def _optimize_df(df, settings, mode):
     return df.drop_duplicates(subset=['barcode_cleaned'], keep='last')
 
 def _transform_horizontal(file, settings, indices):
-    file.seek(0)
+    # [수정] 파일 객체일 때만 seek(0) 호출
+    if hasattr(file, 'seek'): 
+        file.seek(0)
+        
     try: df = pd.read_excel(file, dtype=str)
     except: 
-        file.seek(0)
+        # [수정] CSV 재시도 시에도 seek 확인
+        if hasattr(file, 'seek'): 
+            file.seek(0)
         df = pd.read_csv(file, dtype=str)
     
     df.columns = [str(c).strip().replace('.0','') for c in df.columns]
