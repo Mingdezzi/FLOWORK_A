@@ -21,9 +21,9 @@
         .folder-item:hover { background-color: #f8f9fa; }
     </style>
 </head>
-<body data-api-list="{{ url_for('product.get_product_image_status') }}" 
-      data-api-process="{{ url_for('product.trigger_image_process') }}"
-      data-api-options="{{ url_for('product.get_user_options') }}"
+<body data-api-list="{{ url_for('product.api_get_product_image_status') }}" 
+      data-api-process="{{ url_for('product.api_trigger_image_process') }}"
+      data-api-options="{{ url_for('product.api_get_user_options') }}"
       data-api-task-status-prefix="/api/task_status/"
       data-api-folder-prefix="/api/product/folder/"
       data-api-logo-upload="{{ url_for('admin.api_upload_logo') }}">

@@ -23,8 +23,8 @@ def _hex_to_rgb(hex_value):
     hex_value = hex_value.lstrip('#')
     return tuple(int(hex_value[i:i+2], 16) for i in (0, 2, 4))
 
+# [중요] 이 함수가 있어야 apis.py에서 import 오류가 나지 않습니다.
 def save_options_logic(user_id, brand_id, options):
-    """사용자가 선택한 이미지 처리 옵션(배경색, 여백 등)을 DB에 저장"""
     try:
         key = f'IMG_OPTS_{user_id}'
         val = json.dumps(options)
