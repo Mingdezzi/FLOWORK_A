@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // [수정] CSRF 토큰 가져오기 (일관성 유지를 위해 추가)
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
     const brandSelect = document.getElementById('brand_id');
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     brandSelect.addEventListener('change', async () => {
         const brandId = brandSelect.value;
         
+        // 브랜드를 선택하지 않은 경우
         if (!brandId) {
             storeSelect.innerHTML = '<option value="">-- 브랜드를 먼저 선택하세요 --</option>';
             storeSelect.disabled = true;
@@ -23,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         storeSelect.innerHTML = '<option value="">매장 목록 로드 중...</option>';
         storeSelect.disabled = true;
 
+        // API URL 생성 (기본 URL의 '0'을 선택된 brandId로 교체)
         const fetchUrl = apiBaseUrl.replace('/0/', `/${brandId}/`);
 
         try {
@@ -30,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken 
+                    'X-CSRFToken': csrfToken // [수정] CSRF 헤더 추가
                 }
             });
             const data = await response.json();
@@ -39,7 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || '매장 목록 로드 실패');
             }
 
-            storeSelect.innerHTML = ''; 
+            // 매장 선택 드롭다운 채우기
+            storeSelect.innerHTML = ''; // 기존 옵션 비우기
             if (data.stores.length === 0) {
                 storeSelect.innerHTML = '<option value="">-- 가입 가능한 매장이 없습니다 --</option>';
             } else {

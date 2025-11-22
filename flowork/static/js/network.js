@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+    // 1. 건의사항 작성
     const suggForm = document.getElementById('suggestion-form');
     if (suggForm) {
         suggForm.addEventListener('submit', (e) => {
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 2. 건의사항 댓글
     const btnComment = document.getElementById('btn-save-comment');
     if (btnComment) {
         btnComment.addEventListener('click', () => {
@@ -45,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 3. 건의사항 삭제
     const btnDelSugg = document.querySelector('.btn-delete-sugg');
     if (btnDelSugg) {
         btnDelSugg.addEventListener('click', () => {
@@ -60,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 4. 메일 발송
     const mailForm = document.getElementById('mail-form');
     if (mailForm) {
         mailForm.addEventListener('submit', (e) => {
@@ -90,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 5. 메일 삭제
     const btnDelMail = document.querySelector('.btn-delete-mail');
     if (btnDelMail) {
         btnDelMail.addEventListener('click', () => {

@@ -8,7 +8,6 @@ psycopg2-binary
 bcrypt
 flask-login
 Flask-WTF
-Flask-Caching
 rembg[cpu]
 aiohttp
 aiofiles

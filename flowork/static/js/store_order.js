@@ -2,9 +2,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const today = new Date().toISOString().split('T')[0];
     
+    // 모달 날짜 초기화
     const dateInput = document.getElementById('req-date');
     if (dateInput) dateInput.value = today;
 
+    // --- 상품 검색/선택 로직 (이전 모듈과 유사) ---
     const reqPnInput = document.getElementById('req-pn');
     const searchBtn = document.getElementById('btn-search-prod');
     const searchResults = document.getElementById('search-results');
@@ -45,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function selectProduct(pn) {
         searchResults.style.display = 'none';
         reqPnInput.value = pn;
+        // 상세 옵션 로드 (sales API 재활용)
         const detailRes = await fetch('/api/sales/search_products', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -81,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sizeSelect.addEventListener('change', () => { selectedVariantId = sizeSelect.value; });
     }
 
+    // --- 주문/반품 요청 등록 ---
     const btnSubmit = document.getElementById('btn-submit-order') || document.getElementById('btn-submit-return');
     if (btnSubmit) {
         btnSubmit.addEventListener('click', async () => {
@@ -107,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- 관리자: 승인/거절 ---
     document.body.addEventListener('click', async (e) => {
         const urlPrefix = document.body.dataset.apiStatusPrefix;
         if (!urlPrefix) return;

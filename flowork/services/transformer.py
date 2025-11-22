@@ -3,10 +3,6 @@ import numpy as np
 from flowork.services.brand_logic import get_brand_logic
 
 def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_mapping_config, column_map_indices):
-    """
-    가로형(Matrix) 엑셀 데이터(사이즈가 컬럼으로 나열됨)를 
-    세로형(List) 데이터(품번-컬러-사이즈 1행)로 변환
-    """
     file_stream.seek(0)
     try:
         df_stock = pd.read_excel(file_stream, dtype=str)
@@ -18,10 +14,14 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             file_stream.seek(0)
             df_stock = pd.read_csv(file_stream, encoding='cp949', dtype=str)
 
-    # 컬럼명 정리 (.0 제거)
-    df_stock.columns = [str(col).strip().replace('.0', '') for col in df_stock.columns]
+    new_columns = []
+    for col in df_stock.columns:
+        str_col = str(col).strip()
+        if str_col.endswith('.0'):
+            str_col = str_col[:-2]
+        new_columns.append(str_col)
+    df_stock.columns = new_columns
 
-    # 기본 정보 추출
     extracted_data = pd.DataFrame()
     field_to_col_idx = {
         'product_number': column_map_indices.get('product_number'),
@@ -40,7 +40,6 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         else:
             extracted_data[field] = None
 
-    # 사이즈 컬럼 탐지 (0~29 헤더)
     target_size_headers = [str(i) for i in range(30)]
     size_cols = [col for col in df_stock.columns if col in target_size_headers]
     
@@ -50,14 +49,12 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
 
     df_merged = pd.concat([extracted_data, df_stock[size_cols]], axis=1)
 
-    # 카테고리 및 매핑 키 결정
     logic_name = category_mapping_config.get('LOGIC', 'GENERIC')
     logic_module = get_brand_logic(logic_name)
 
     df_merged['DB_Category'] = df_merged.apply(lambda r: logic_module.get_db_item_category(r, category_mapping_config), axis=1)
     df_merged['Mapping_Key'] = df_merged.apply(logic_module.get_size_mapping_key, axis=1)
 
-    # Unpivot (Melt)
     id_vars = ['product_number', 'product_name', 'color', 'original_price', 'sale_price', 'release_year', 'DB_Category', 'Mapping_Key']
     
     df_melted = df_merged.melt(
@@ -67,7 +64,6 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         value_name='Quantity'
     )
 
-    # 사이즈 코드 매핑 (Code -> Real Size)
     mapping_list = []
     for key, map_data in size_mapping_config.items():
         for code, real_size in map_data.items():
@@ -78,10 +74,10 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
             })
     
     df_map = pd.DataFrame(mapping_list)
+    
     df_melted['Size_Code'] = df_melted['Size_Code'].astype(str)
     df_final = df_melted.merge(df_map, on=['Mapping_Key', 'Size_Code'], how='left')
 
-    # 기타 매핑 처리
     if '기타' in size_mapping_config:
         other_map_list = [{'Size_Code': str(code), 'Real_Size_Other': str(val)} 
                           for code, val in size_mapping_config['기타'].items()]
@@ -89,19 +85,18 @@ def transform_horizontal_to_vertical(file_stream, size_mapping_config, category_
         df_final = df_final.merge(df_other_map, on='Size_Code', how='left')
         df_final['Real_Size'] = df_final['Real_Size'].fillna(df_final['Real_Size_Other'])
 
-    # 사이즈 없는 행 제거
     df_final = df_final.dropna(subset=['Real_Size'])
 
-    # 데이터 타입 변환 및 정리
     df_final['hq_stock'] = pd.to_numeric(df_final['Quantity'], errors='coerce').fillna(0).astype(int)
+    
     df_final['original_price'] = pd.to_numeric(df_final['original_price'], errors='coerce').fillna(0).astype(int)
     df_final['sale_price'] = pd.to_numeric(df_final['sale_price'], errors='coerce').fillna(0).astype(int)
     
-    # 가격 0원 보정
-    op = df_final['original_price']
-    sp = df_final['sale_price']
-    df_final['sale_price'] = np.where((op > 0) & (sp == 0), op, sp)
-    df_final['original_price'] = np.where((sp > 0) & (op == 0), sp, op)
+    condition_op_only = (df_final['original_price'] > 0) & (df_final['sale_price'] == 0)
+    condition_sp_only = (df_final['sale_price'] > 0) & (df_final['original_price'] == 0)
+    
+    df_final['sale_price'] = np.where(condition_op_only, df_final['original_price'], df_final['sale_price'])
+    df_final['original_price'] = np.where(condition_sp_only, df_final['sale_price'], df_final['original_price'])
     
     df_final['release_year'] = pd.to_numeric(df_final['release_year'], errors='coerce').fillna(0).astype(int)
     
