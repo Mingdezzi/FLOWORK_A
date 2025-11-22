@@ -1,3 +1,5 @@
+import uuid
+import threading
 import traceback
 import os
 import io
@@ -118,7 +120,7 @@ def trigger_image_process():
         return jsonify({'status': 'error', 'message': '선택된 품번이 없습니다.'}), 400
 
     try:
-        # 옵션 저장 로직 호출 (자동 저장)
+        # [신규] 옵션 저장 로직 호출 (자동 저장)
         save_options_logic(current_user.id, current_user.current_brand_id, options)
 
         for code in style_codes:
