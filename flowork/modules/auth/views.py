@@ -6,7 +6,7 @@ from flowork.modules.auth.services import authenticate_user, create_brand_and_ad
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login_view():
     if current_user.is_authenticated:
-        return redirect(url_for('ui.home')) 
+        return redirect(url_for('main.home')) 
 
     if request.method == 'POST':
         brand_id_str = request.form.get('brand_id')
@@ -21,7 +21,7 @@ def login_view():
                 login_user(user)
                 flash('로그인 성공!', 'success')
                 next_page = request.args.get('next')
-                return redirect(next_page or url_for('ui.home'))
+                return redirect(next_page or url_for('main.home'))
             else:
                 flash('로그인 실패. 정보를 확인하세요. (승인 대기 매장일 수 있습니다)', 'error')
                 
@@ -40,7 +40,7 @@ def logout_view():
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register_brand_view():
     if current_user.is_authenticated:
-        return redirect(url_for('ui.home'))
+        return redirect(url_for('main.home'))
         
     if request.method == 'POST':
         brand_name = request.form.get('brand_name')
@@ -61,7 +61,7 @@ def register_brand_view():
 @auth_bp.route('/register_store', methods=['GET', 'POST'])
 def register_store_view():
     if current_user.is_authenticated:
-        return redirect(url_for('ui.home'))
+        return redirect(url_for('main.home'))
         
     if request.method == 'POST':
         try:
