@@ -40,8 +40,12 @@ class Config:
     CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
     CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
     CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+    
+    # [신규] Celery 워커 메모리 누수 방지 설정
+    # 워커 프로세스가 50개의 작업을 처리하면 자동으로 재시작되어 메모리를 초기화합니다.
+    CELERY_WORKER_MAX_TASKS_PER_CHILD = 50
 
-    # [신규] Caching 설정 (Redis)
+    # Caching 설정 (Redis)
     CACHE_TYPE = 'RedisCache'
-    CACHE_REDIS_URL = CELERY_BROKER_URL  # Celery와 동일한 Redis 사용
-    CACHE_DEFAULT_TIMEOUT = 300          # 기본 캐시 시간 5분
+    CACHE_REDIS_URL = CELERY_BROKER_URL
+    CACHE_DEFAULT_TIMEOUT = 300
