@@ -1,5 +1,6 @@
 import traceback
 import os
+import gc
 from flask import current_app
 from flowork.extensions import celery
 from flowork.services.excel import parse_stock_excel, verify_stock_excel
@@ -36,6 +37,9 @@ def task_process_images(self, brand_id, style_codes, options):
             'status': 'error',
             'message': str(e)
         }
+    finally:
+        # [신규] 이미지 처리 후 메모리 강제 회수 (누수 방지)
+        gc.collect()
 
 @celery.task(bind=True)
 def task_upsert_inventory(self, file_path, form_data, upload_mode, brand_id, target_store_id, excluded_indices, allow_create):
@@ -66,6 +70,8 @@ def task_upsert_inventory(self, file_path, form_data, upload_mode, brand_id, tar
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+        # [신규] 대용량 엑셀 처리 후에도 메모리 정리
+        gc.collect()
 
 @celery.task(bind=True)
 def task_import_db(self, file_path, form_data, brand_id):
@@ -102,3 +108,5 @@ def task_import_db(self, file_path, form_data, brand_id):
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+        # [신규] 메모리 정리
+        gc.collect()
