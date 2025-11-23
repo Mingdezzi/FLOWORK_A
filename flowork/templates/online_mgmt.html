@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>FLOWORK - 온라인 관리</title>
+    <title>FLOWORK</title>
+    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -18,7 +19,6 @@
         
         .section-divider { border-top: 2px dashed #dee2e6; margin: 2rem 0; }
         
-        /* 모달 스타일 */
         .modal-img-container { position: relative; text-align: center; background-color: #f0f0f0; min-height: 300px; display: flex; align-items: center; justify-content: center; }
         .modal-img-container img { max-width: 100%; max-height: 600px; }
         .folder-item { cursor: pointer; padding: 5px 10px; border-bottom: 1px solid #eee; }
