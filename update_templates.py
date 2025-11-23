@@ -10,11 +10,15 @@ TEMPLATE_DIR = os.path.join('flowork', 'templates')
 BACKUP_DIR = os.path.join('flowork', f'templates_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
 BASE_TEMPLATE = 'base.html'
 
-# 작업 제외 파일
+# 작업 제외 파일 (에러 페이지들은 제거하여 처리 대상에 포함됨)
 EXCLUDED_FILES = [
-    'base.html', '_header.html', '_navigation.html', '_bottom_nav.html', 
-    'login.html', 'register.html', 'register_store.html',
-    '403.html', '404.html', '500.html'
+    'base.html', 
+    '_header.html', 
+    '_navigation.html', 
+    '_bottom_nav.html', 
+    'login.html', 
+    'register.html', 
+    'register_store.html'
 ]
 
 # ------------------------------------------------------------------------------
@@ -32,6 +36,7 @@ SCRIPT_PATTERN = re.compile(r'<script.*?>.*?</script>', re.DOTALL | re.IGNORECAS
 # 3. 불필요 요소 제거
 INCLUDE_HEADER_PATTERN = re.compile(r'{%\s*include\s*[\'"]_header\.html[\'"]\s*%}', re.IGNORECASE)
 INCLUDE_NAV_PATTERN = re.compile(r'{%\s*include\s*[\'"]_navigation\.html[\'"]\s*%}', re.IGNORECASE)
+# _navigation.html은 조건부로 들어갈 수도 있으니 주의 (보통 base.html에 포함됨)
 FLASH_MSG_PATTERN = re.compile(r'{%\s*with\s*messages\s*=\s*get_flashed_messages.*?{%\s*endwith\s*%}', re.DOTALL)
 DOCTYPE_PATTERN = re.compile(r'<!DOCTYPE html>', re.IGNORECASE)
 HTML_TAG_PATTERN = re.compile(r'<html.*?>|</html>', re.IGNORECASE)
@@ -46,17 +51,13 @@ def process_file(filepath, filename):
         return
 
     # [1단계] 클리닝: 기존에 잘못 적용된 Jinja 구문이나 HTML 껍데기 제거
-    # 만약 이전에 스크립트가 extends를 추가했다면 제거하고 원본 내용만 남김
     clean_content = JINJA_EXTENDS_PATTERN.sub('', content)
     clean_content = JINJA_BLOCK_PATTERN.sub('', clean_content)
 
     # [2단계] 본문 추출
-    # <body> 태그 내부를 찾습니다.
-    body_match = BODY_CONTENT_PATTERN.search(content) # 원본 content에서 찾음 (안전)
+    body_match = BODY_CONTENT_PATTERN.search(content)
     
     if not body_match:
-        # body 태그가 없다면, 이미 정리된 파일이거나 조각 파일일 수 있음
-        # 하지만 "반영 안됨" 문제 해결을 위해 강제로 내부 내용을 찾음
         print(f"⚠️  [주의] <body> 태그 없음. 전체 내용을 본문으로 간주: {filename}")
         body_inner = clean_content
         body_attrs = ""
@@ -65,12 +66,11 @@ def process_file(filepath, filename):
         attr_match = BODY_ATTR_PATTERN.search(content)
         body_attrs = attr_match.group(1).strip() if attr_match else ""
 
-    # [3단계] 불필요한 코드 제거 (헤더, 네비게이션, 플래시메시지, HTML 태그 등)
+    # [3단계] 불필요한 코드 제거
     body_inner = INCLUDE_HEADER_PATTERN.sub('', body_inner)
     body_inner = INCLUDE_NAV_PATTERN.sub('', body_inner)
     body_inner = FLASH_MSG_PATTERN.sub('', body_inner)
     
-    # 실수로 남은 DOCTYPE, HTML, HEAD 태그 등이 body 내부에 있다면 제거
     body_inner = DOCTYPE_PATTERN.sub('', body_inner)
     body_inner = HTML_TAG_PATTERN.sub('', body_inner)
     body_inner = HEAD_TAG_PATTERN.sub('', body_inner)
@@ -79,7 +79,6 @@ def process_file(filepath, filename):
     extracted_scripts = []
     def script_handler(match):
         s = match.group(0)
-        # 공통 라이브러리 스크립트는 삭제 (base.html에 있음)
         if 'bootstrap' in s.lower() or 'jquery' in s.lower():
             return ''
         extracted_scripts.append(s)
@@ -121,7 +120,6 @@ def main():
         print("❌ 템플릿 폴더를 찾을 수 없습니다.")
         return
 
-    # 안전을 위해 백업 생성
     if not os.path.exists(BACKUP_DIR):
         os.makedirs(BACKUP_DIR)
         print(f"📦 안전 백업 생성 중... ({BACKUP_DIR})")
@@ -138,7 +136,6 @@ def main():
                 count += 1
     
     print(f"\n✨ 총 {count}개 파일 강제 변환 완료.")
-    print(f"   혹시 문제가 생기면 '{BACKUP_DIR}' 폴더의 파일로 복구하세요.")
 
 if __name__ == '__main__':
     main()
