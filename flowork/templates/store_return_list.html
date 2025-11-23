@@ -1,21 +1,14 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>FLOWORK</title>
-    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body data-product-search-url="{{ url_for('api.api_order_product_search') }}" 
+{% extends 'base.html' %}
+
+{% block body_attrs %}data-product-search-url="{{ url_for('api.api_order_product_search') }}" 
       data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
       data-api-create="{{ url_for('api.create_store_return') }}"
-      data-api-status-prefix="/api/store_returns/">
-      
-    <div class="container my-4">
-        {% include '_header.html' %}
-        {% include '_navigation.html' %}
+      data-api-status-prefix="/api/store_returns/"{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+        
+        
 
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="section-title mb-0"><i class="bi bi-box-arrow-left me-2"></i>본사 반품 내역</h2>
@@ -100,8 +93,8 @@
             </div>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/store_order.js') }}"></script>
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/store_order.js') }}"></script>
+{% endblock %}

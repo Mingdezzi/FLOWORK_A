@@ -1,102 +1,18 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FLOWORK</title>
-    
-    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css' rel='stylesheet' />
-    
-    <style>
-        #calendar {
-            max-width: 100%;
-            margin: 0 auto;
-            height: calc(100vh - 180px);
-            min-height: 500px;
-        }
+{% extends 'base.html' %}
 
-        .fc .fc-button-primary {
-            background-color: #eb6864;
-            border-color: #eb6864;
-        }
-        .fc .fc-button-primary:hover {
-            background-color: #e05c58;
-            border-color: #e05c58;
-        }
-        .fc .fc-button-primary:disabled {
-            background-color: #f6b5b3;
-            border-color: #f6b5b3;
-        }
-        .fc .fc-button-primary:not(:disabled).fc-button-active, 
-        .fc .fc-button-primary:not(:disabled):active {
-            background-color: #d6504c;
-            border-color: #d6504c;
-        }
-        .fc-event {
-            font-size: 0.85em;
-            padding: 2px 5px;
-        }
-        .fc-event[data-type="휴무"] { background-color: #dc3545; border-color: #dc3545; }
-        .fc-event[data-type="연차"] { background-color: #fd7e14; border-color: #fd7e14; }
-        .fc-event[data-type="반차"] { background-color: #ffc107; border-color: #ffc107; color: #333; }
-        .fc-event[data-type="병가"] { background-color: #20c997; border-color: #20c997; }
-        .fc-event[data-type="일정"] { background-color: #0d6efd; border-color: #0d6efd; }
-
-        @media (max-width: 768px) {
-            #calendar {
-                height: calc(100vh - 160px);
-                min-height: 400px;
-                font-size: 0.85rem;
-            }
-            
-            .fc .fc-toolbar-title {
-                font-size: 1.1rem !important;
-            }
-            
-            .fc .fc-button {
-                padding: 0.25rem 0.5rem !important;
-                font-size: 0.85rem !important;
-            }
-            
-            .fc-event {
-                font-size: 0.75rem !important;
-            }
-            
-            .fc-col-header-cell-cushion {
-                font-size: 0.9rem;
-                font-weight: normal;
-            }
-        }
-    </style>
-</head>
-<body data-api-schedule-events-url="{{ url_for('api.get_schedule_events') }}"
+{% block body_attrs %}data-api-schedule-events-url="{{ url_for('api.get_schedule_events') }}"
       data-api-schedule-add-url="{{ url_for('api.add_schedule_event') }}"
       data-api-schedule-update-url-prefix="{{ url_for('api.update_schedule_event', event_id=0)[:-1] }}"
-      data-api-schedule-delete-url-prefix="{{ url_for('api.delete_schedule_event', event_id=0)[:-1] }}">
-      
-    <div class="container my-4">
+      data-api-schedule-delete-url-prefix="{{ url_for('api.delete_schedule_event', event_id=0)[:-1] }}"{% endblock %}
+
+{% block content %}
+<div class="container my-4">
         
-        {% include '_header.html' %}
+        
 
-        {% include '_navigation.html' %}
+        
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert {{ 'alert-success' if category == 'success' else ('alert-info' if category == 'info' else ('alert-warning' if category == 'warning' else 'alert-danger')) }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        
 
         <div class="card mb-3">
             <div class="card-header">
@@ -179,14 +95,10 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.js'></script>
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
-    
-    <script src="{{ url_for('static', filename='js/schedule.js') }}" defer></script>
-    
-</body>
-</html>
+{% block scripts %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<script src="{{ url_for('static', filename='js/schedule.js') }}" defer></script>
+{% endblock %}

@@ -1,35 +1,13 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FLOWORK</title>
-    
-    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
-</head>
-<body>
-    <div class="container my-4">
-        
-        {% include '_header.html' %}
+{% extends 'base.html' %}
 
-        {% include '_navigation.html' %}
+{% block content %}
+<div class="container my-4">
         
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert {{ 'alert-success' if category == 'success' else ('alert-info' if category == 'info' else ('alert-warning' if category == 'warning' else 'alert-danger')) }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        
+
+        
+        
+        
 
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -112,13 +90,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             </form>
             
-            <script>
-                document.getElementById('btn-delete-item').addEventListener('click', () => {
-                    if (confirm('🚨 이 공지사항을 정말 삭제하시겠습니까?')) {
-                        document.getElementById('delete-item-form').submit();
-                    }
-                });
-            </script>
+            
             {% endif %}
         </div>
 
@@ -169,8 +141,14 @@
         {% endif %}
 
     </div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    
-</body>
-</html>
+{% block scripts %}
+<script>
+                document.getElementById('btn-delete-item').addEventListener('click', () => {
+                    if (confirm('🚨 이 공지사항을 정말 삭제하시겠습니까?')) {
+                        document.getElementById('delete-item-form').submit();
+                    }
+                });
+            </script>
+{% endblock %}

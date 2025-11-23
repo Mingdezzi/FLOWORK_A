@@ -1,67 +1,18 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FLOWORK</title>
-    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://unpkg.com/hangul-js"></script>
-    <style>
-        .sales-container { display: flex; gap: 20px; height: calc(100vh - 160px); }
-        .sales-left { flex: 1.3; display: flex; flex-direction: column; transition: background-color 0.3s; padding: 15px; border-radius: 8px; overflow: hidden; }
-        .sales-right { flex: 1.4; display: flex; flex-direction: column; border-left: 1px solid #dee2e6; padding-left: 20px; overflow: hidden; }
-        
-        .mode-sales-bg { background-color: #ffffff; }
-        .mode-refund-bg { background-color: #fff0f0; }
+{% extends 'base.html' %}
 
-        .cart-table-wrapper { flex-grow: 1; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; background: #fff; }
-        
-        .left-table-wrapper { flex-grow: 1; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; background: #fff; margin-top: 10px; }
-        .left-table { font-size: 0.8rem; width: 100%; table-layout: fixed; } 
-        .left-table th, .left-table td { 
-            padding: 6px 4px; 
-            vertical-align: middle; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            white-space: nowrap; 
-        }
-        .left-table tbody tr { cursor: pointer; }
-        .left-table tbody tr:hover { background-color: #f8f9fa; }
-
-        .left-table th:nth-child(1), .left-table td:nth-child(1) { width: 27%; } 
-        .left-table th:nth-child(2), .left-table td:nth-child(2) { width: 28%; }
-        .left-table th:nth-child(3), .left-table td:nth-child(3) { width: 9%; }
-        .left-table th:nth-child(4), .left-table td:nth-child(4) { width: 9%; text-align: center; }
-        .left-table th:nth-child(5), .left-table td:nth-child(5) { width: 11%; text-align: right; }
-        .left-table th:nth-child(6), .left-table td:nth-child(6) { width: 11%; text-align: right; }
-        .left-table th:nth-child(7), .left-table td:nth-child(7) { width: 5%; text-align: center; }
-
-        .cart-input { width: 70px; text-align: right; padding: 2px 5px; font-size: 0.9rem; }
-
-        @media (max-width: 768px) {
-            .sales-container { flex-direction: column; height: auto; }
-            .sales-left { flex: none; width: 100%; height: auto; max-height: 600px; border-bottom: 1px solid #dee2e6; margin-bottom: 10px; padding-bottom: 20px; }
-            .sales-right { flex: none; width: 100%; border-left: none; padding-left: 0; height: auto; }
-            .left-table-wrapper { max-height: 300px; }
-            .cart-table-wrapper { max-height: 400px; }
-        }
-    </style>
-</head>
-<body data-api-urls='{
+{% block body_attrs %}data-api-urls='{
     "searchSalesProducts": "{{ url_for("api.search_sales_products") }}",
     "getRefundRecords": "{{ url_for("api.get_refund_records") }}",
     "submitSales": "{{ url_for("api.create_sale") }}",
     "saleDetails": "{{ url_for("api.get_sale_details", sale_id=999999) }}",
     "refund": "{{ url_for("api.refund_sale", sale_id=999999) }}",
     "salesSettings": "{{ url_for("api.sales_settings") }}"
-}'>
-    
-    <div class="container my-4">
-        {% include '_header.html' %}
-        {% include '_navigation.html' %}
+}'{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+        
+        
 
         <div class="sales-container">
             <div class="sales-left" id="sales-left-panel">
@@ -243,9 +194,9 @@
 
     <div class="modal fade" id="settings-modal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">판매 설정</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><h6>금액별 할인 설정</h6><div id="discount-rules-container"></div><button class="btn btn-sm btn-outline-primary mt-2" id="btn-add-discount-rule">+ 규칙 추가</button></div><div class="modal-footer"><button class="btn btn-primary" id="btn-save-settings">저장</button></div></div></div></div>
     <div class="modal fade" id="record-modal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">일자별 판매 내역</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="date" id="record-lookup-date" class="form-control mb-2"><table class="table table-sm"><tbody id="record-lookup-tbody"></tbody></table></div></div></div></div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sales.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sales.js') }}"></script>
+{% endblock %}

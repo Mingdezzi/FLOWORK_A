@@ -1,36 +1,17 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FLOWORK</title>
-    <link rel="icon" href="{{ url_for('static', filename='symbol.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/journal/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-{% set is_view_mode = (order and order.id and not form_data) %}
-{% set data = form_data or order %}
-<body data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
+{% extends 'base.html' %}
+
+{% block body_attrs %}data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
       data-product-search-url="{{ url_for('api.api_order_product_search') }}"
       data-current-color="{{ data.color or '' }}"
       data-current-size="{{ data.size or '' }}"
-      data-page-mode="{{ 'view' if is_view_mode else 'edit' }}">
-      
-    <div class="container my-4">
-        {% include '_header.html' %}
-        {% include '_navigation.html' %}
+      data-page-mode="{{ 'view' if is_view_mode else 'edit' }}"{% endblock %}
+
+{% block content %}
+<div class="container my-4">
         
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert {{ 'alert-success' if category == 'success' else ('alert-info' if category == 'info' else ('alert-warning' if category == 'warning' else 'alert-danger')) }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        
+        
+        
 
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -119,10 +100,10 @@
             <td class="text-center"><button type="button" class="btn btn-danger btn-sm py-0 px-1 btn-delete-row editable-on-demand"><i class="bi bi-trash"></i></button></td>
         </tr>
     </template>
+{% endblock %}
 
-    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/order.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/order.js') }}"></script>
+{% endblock %}

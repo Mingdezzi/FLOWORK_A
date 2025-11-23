@@ -14,7 +14,7 @@
     
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body {% block body_attrs %}{% endblock %}>
 
     <aside class="sidebar-desktop d-none d-lg-flex flex-column border-end bg-light h-100 position-fixed top-0 start-0" style="width: 260px; z-index: 1020;">
         <div class="p-3 border-bottom text-center bg-white">
