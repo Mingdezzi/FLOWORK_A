@@ -21,7 +21,7 @@ class SalesService:
                                   .order_by(Sale.daily_number.desc()).first()
             next_num = (last_sale.daily_number + 1) if last_sale else 1
             
-            # 3. 판매 레코드 생성 (상수 적용)
+            # 3. 판매 레코드 생성
             new_sale = Sale(
                 store_id=store_id,
                 user_id=user_id,
@@ -32,7 +32,7 @@ class SalesService:
                 is_online=is_online
             )
             db.session.add(new_sale)
-            db.session.flush() # ID 생성
+            db.session.flush() # ID 생성을 위해 flush
             
             total_amount = 0
             
@@ -40,12 +40,26 @@ class SalesService:
             for item in items:
                 variant_id = item.get('variant_id')
                 qty = int(item.get('quantity', 1))
-                unit_price = int(item.get('price', 0))
+                
+                # [보안 패치] DB에서 상품 정보를 직접 조회하여 가격 위변조 방지
+                variant = db.session.get(Variant, variant_id)
+                if not variant:
+                    raise ValueError(f"상품 정보를 찾을 수 없습니다. (Variant ID: {variant_id})")
+
+                # 클라이언트가 보낸 가격 대신 DB의 실제 판매가 사용
+                unit_price = variant.sale_price
+                
+                # 할인 금액 검증
                 discount_amt = int(item.get('discount_amount', 0))
+                if discount_amt < 0: 
+                    discount_amt = 0
+                if discount_amt > unit_price:
+                    raise ValueError(f"할인 금액이 상품 가격보다 클 수 없습니다. ({variant.product.product_name})")
+
                 discounted_price = unit_price - discount_amt
                 subtotal = discounted_price * qty
                 
-                # 재고 조회 및 차감
+                # 재고 조회 및 차감 (Row Lock)
                 stock = StoreStock.query.filter_by(store_id=store_id, variant_id=variant_id).with_for_update().first()
                 if not stock:
                     stock = StoreStock(store_id=store_id, variant_id=variant_id, quantity=0)
@@ -54,7 +68,7 @@ class SalesService:
                 current_qty = stock.quantity
                 stock.quantity -= qty
                 
-                # 이력 기록 (상수 적용)
+                # 이력 기록
                 history = StockHistory(
                     store_id=store_id,
                     variant_id=variant_id,
@@ -65,11 +79,7 @@ class SalesService:
                 )
                 db.session.add(history)
                 
-                # 상품 정보 조회 (스냅샷 저장용)
-                variant = db.session.get(Variant, variant_id)
-                if not variant:
-                    raise ValueError(f"Variant ID {variant_id} not found")
-
+                # 판매 상세 아이템 저장 (스냅샷)
                 sale_item = SaleItem(
                     sale_id=new_sale.id,
                     variant_id=variant_id,
@@ -78,7 +88,7 @@ class SalesService:
                     color=variant.color,
                     size=variant.size,
                     original_price=variant.original_price,
-                    unit_price=unit_price,
+                    unit_price=unit_price, # 검증된 DB 가격
                     discount_amount=discount_amt,
                     discounted_price=discounted_price,
                     quantity=qty,
@@ -113,15 +123,14 @@ class SalesService:
             for item in sale.items:
                 if item.quantity <= 0: continue
                 
-                stock = StoreStock.query.filter_by(store_id=store_id, variant_id=item.variant_id).first()
-                # 재고가 없으면 생성 (드문 경우)
+                stock = StoreStock.query.filter_by(store_id=store_id, variant_id=item.variant_id).with_for_update().first()
+                # 재고가 없으면 생성
                 if not stock:
                     stock = StoreStock(store_id=store_id, variant_id=item.variant_id, quantity=0)
                     db.session.add(stock)
 
                 stock.quantity += item.quantity
                 
-                # 상수 적용
                 history = StockHistory(
                     store_id=store_id,
                     variant_id=item.variant_id,
@@ -144,7 +153,8 @@ class SalesService:
     @staticmethod
     def refund_sale_partial(sale_id, store_id, user_id, refund_items):
         try:
-            sale = Sale.query.filter_by(id=sale_id, store_id=store_id).first()
+            # 부분 환불 시에도 Lock을 걸어 동시성 문제 방지
+            sale = Sale.query.filter_by(id=sale_id, store_id=store_id).with_for_update().first()
             if not sale: return {'status': 'error', 'message': '내역 없음'}
             if sale.status == SaleStatus.REFUNDED: 
                 return {'status': 'error', 'message': '이미 전체 환불된 건입니다.'}
@@ -160,6 +170,7 @@ class SalesService:
                 sale_item = SaleItem.query.filter_by(sale_id=sale.id, variant_id=variant_id).first()
                 
                 if sale_item and sale_item.quantity >= refund_qty:
+                    # 환불 금액 계산 (할인 적용가 기준)
                     refund_amount = sale_item.discounted_price * refund_qty
                     
                     sale_item.quantity -= refund_qty
@@ -167,14 +178,14 @@ class SalesService:
                     sale.total_amount -= refund_amount
                     total_refunded_amount += refund_amount
                     
-                    stock = StoreStock.query.filter_by(store_id=store_id, variant_id=variant_id).first()
+                    # 재고 복구
+                    stock = StoreStock.query.filter_by(store_id=store_id, variant_id=variant_id).with_for_update().first()
                     if not stock:
                         stock = StoreStock(store_id=store_id, variant_id=variant_id, quantity=0)
                         db.session.add(stock)
 
                     stock.quantity += refund_qty
                         
-                    # 상수 적용
                     history = StockHistory(
                         store_id=store_id,
                         variant_id=variant_id,
@@ -185,7 +196,7 @@ class SalesService:
                     )
                     db.session.add(history)
 
-            # 모든 아이템이 환불되었는지 확인
+            # 모든 아이템이 환불(수량 0)되었는지 확인하여 상태 업데이트
             all_zero = True
             for item in sale.items:
                 if item.quantity > 0:
