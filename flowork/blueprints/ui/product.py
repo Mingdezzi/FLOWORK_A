@@ -1,10 +1,10 @@
 import traceback
-from flask import render_template, request, abort
+from flask import render_template, request, abort, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
-from flowork.models import db, Product, Variant
+from flowork.models import db, Product, Variant, Store
 from flowork.utils import clean_string_upper
 from flowork.services.db import get_filter_options_from_db
 from flowork.services.product_service import ProductService
@@ -36,7 +36,7 @@ def product_detail(product_id):
         return render_template('detail.html', **context)
 
     except Exception as e:
-        print(f"Error loading product detail: {e}")
+        current_app.logger.error(f"Error loading product detail: {e}")
         traceback.print_exc()
         abort(500, description="상품 상세 정보를 불러오는 중 오류가 발생했습니다.")
 
@@ -57,7 +57,7 @@ def stock_overview():
         return render_template('stock_overview.html', **context)
 
     except Exception as e:
-        print(f"Error loading stock overview: {e}")
+        current_app.logger.error(f"Error loading stock overview: {e}")
         traceback.print_exc()
         abort(500, description="통합 재고 현황 로드 중 오류가 발생했습니다.")
 
@@ -146,6 +146,49 @@ def list_page():
         return render_template('list.html', **context)
 
     except Exception as e:
-        print(f"Error loading list page: {e}")
+        current_app.logger.error(f"Error loading list page: {e}")
         traceback.print_exc()
         abort(500, description="상세 검색 중 오류가 발생했습니다.")
+
+@ui_bp.route('/check')
+@login_required
+def check_page():
+    all_stores = []
+    if not current_user.store_id:
+        all_stores = Store.query.filter_by(
+            brand_id=current_user.current_brand_id,
+            is_active=True
+        ).order_by(Store.store_name).all()
+        
+    return render_template('check.html', active_page='check', all_stores=all_stores)
+
+@ui_bp.route('/stock')
+@login_required
+def stock_management():
+    try:
+        missing_data_products = Product.query.filter(
+            Product.brand_id == current_user.current_brand_id, 
+            or_(
+                Product.item_category.is_(None),
+                Product.item_category == '',
+                Product.release_year.is_(None)
+            )
+        ).order_by(Product.product_number).all()
+        
+        all_stores = []
+        if not current_user.store_id:
+            all_stores = Store.query.filter_by(
+                brand_id=current_user.current_brand_id,
+                is_active=True
+            ).order_by(Store.store_name).all()
+        
+        context = {
+            'active_page': 'stock',
+            'missing_data_products': missing_data_products,
+            'all_stores': all_stores
+        }
+        return render_template('stock.html', **context)
+
+    except Exception as e:
+        current_app.logger.error(f"Error loading stock management page: {e}")
+        abort(500, description="DB 관리 페이지 로드 중 오류가 발생했습니다.")
