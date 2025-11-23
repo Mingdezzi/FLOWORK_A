@@ -30,16 +30,18 @@ def create_app(config_class):
     csrf.init_app(app)
     migrate.init_app(app, db)
     
-    # [신규] 캐시 초기화
     cache.init_app(app)
 
     celery.conf.broker_url = app.config['CELERY_BROKER_URL']
     celery.conf.result_backend = app.config['CELERY_RESULT_BACKEND']
+    
+    # [수정] Celery 설정 업데이트 (메모리 관리 설정 적용)
     celery.conf.update(
         accept_content=['json'],
         task_serializer='json',
         result_serializer='json',
-        timezone=os.environ.get('TZ', 'Asia/Seoul')
+        timezone=os.environ.get('TZ', 'Asia/Seoul'),
+        worker_max_tasks_per_child=app.config.get('CELERY_WORKER_MAX_TASKS_PER_CHILD', 50)
     )
 
     class ContextTask(celery.Task):
@@ -60,7 +62,6 @@ def create_app(config_class):
     app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp)
     
-    # [신규] 로깅 설정
     if not app.debug and not app.testing:
         if not os.path.exists('logs'):
             os.mkdir('logs')
