@@ -1,5 +1,16 @@
 {% extends 'base.html' %}
 
+{% block body_attrs %}
+data-api-urls='{
+    "searchSalesProducts": "{{ url_for("api.search_sales_products") }}",
+    "getRefundRecords": "{{ url_for("api.get_refund_records") }}",
+    "submitSales": "{{ url_for("api.create_sale") }}",
+    "saleDetails": "{{ url_for("api.get_sale_details", sale_id=999999) }}",
+    "refund": "{{ url_for("api.refund_sale", sale_id=999999) }}",
+    "salesSettings": "{{ url_for("api.sales_settings") }}"
+}'
+{% endblock %}
+
 {% block content %}
 <style>
     .sales-container { display: flex; gap: 20px; height: calc(100vh - 160px); }
@@ -41,19 +52,6 @@
         .cart-table-wrapper { max-height: 400px; }
     }
 </style>
-
-
-
-data-api-urls='{
-    "searchSalesProducts": "{{ url_for("api.search_sales_products") }}",
-    "getRefundRecords": "{{ url_for("api.get_refund_records") }}",
-    "submitSales": "{{ url_for("api.create_sale") }}",
-    "saleDetails": "{{ url_for("api.get_sale_details", sale_id=999999) }}",
-    "refund": "{{ url_for("api.refund_sale", sale_id=999999) }}",
-    "salesSettings": "{{ url_for("api.sales_settings") }}"
-}'
-
-
 
 <div class="sales-container">
     <div class="sales-left" id="sales-left-panel">
