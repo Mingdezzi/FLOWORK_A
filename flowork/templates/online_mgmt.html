@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-list="{{ url_for('api.get_product_image_status') }}" 
+{% block content %}
+data-api-list="{{ url_for('api.get_product_image_status') }}" 
       data-api-process="{{ url_for('api.trigger_image_process') }}"
       data-api-options="{{ url_for('api.get_user_options') }}"
       data-api-task-status-prefix="/api/task_status/"
       data-api-folder-prefix="/api/product/folder/"
-      data-api-logo-upload="{{ url_for('api.upload_brand_logo') }}"{% endblock %}
+      data-api-logo-upload="{{ url_for('api.upload_brand_logo') }}"
 
-{% block content %}
+
 <div class="container my-4">
         
         

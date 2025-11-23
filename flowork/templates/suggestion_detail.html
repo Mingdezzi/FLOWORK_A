@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-create-url="{{ url_for('api.create_suggestion') }}"{% endblock %}
-
 {% block content %}
+data-api-create-url="{{ url_for('api.create_suggestion') }}"
+
+
 <div class="container my-4">
         
         

@@ -1,189 +1,144 @@
 import os
 import re
+import shutil
+from datetime import datetime
 
 # ------------------------------------------------------------------------------
-# [설정] 스크립트 실행 환경 설정
+# [설정]
 # ------------------------------------------------------------------------------
-# 템플릿 디렉토리 경로 (프로젝트 루트 기준)
 TEMPLATE_DIR = os.path.join('flowork', 'templates')
+BACKUP_DIR = os.path.join('flowork', f'templates_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+BASE_TEMPLATE = 'base.html'
 
-# 작업에서 제외할 파일 목록 (이미 구조가 잡혀있거나, 부품으로 쓰이는 파일들)
+# 작업 제외 파일
 EXCLUDED_FILES = [
-    'base.html', 
-    '_header.html', 
-    '_navigation.html', 
-    '_bottom_nav.html', 
-    'login.html', 
-    'register.html', 
-    'register_store.html',
-    '403.html', 
-    '404.html', 
-    '500.html'
+    'base.html', '_header.html', '_navigation.html', '_bottom_nav.html', 
+    'login.html', 'register.html', 'register_store.html',
+    '403.html', '404.html', '500.html'
 ]
 
 # ------------------------------------------------------------------------------
-# [정규식 패턴 정의]
+# [정규식 패턴]
 # ------------------------------------------------------------------------------
+# 1. Jinja2 태그 제거용 (기존에 잘못 적용된 상속/블록 태그 삭제)
+JINJA_EXTENDS_PATTERN = re.compile(r'{%\s*extends\s*.*?%}', re.IGNORECASE)
+JINJA_BLOCK_PATTERN = re.compile(r'{%\s*(block|endblock)\s*.*?%}', re.IGNORECASE)
 
-# 1. <body> 태그의 속성 추출 (예: data-api-url="..." 등)
-#    - 대소문자 무시, 태그 안의 속성 그룹 캡처
+# 2. HTML 구조 추출
 BODY_ATTR_PATTERN = re.compile(r'<body\s+([^>]*)>', re.IGNORECASE)
-
-# 2. <body>...</body> 내부 내용 전체 추출
-#    - 개행 문자 포함(DOTALL)
 BODY_CONTENT_PATTERN = re.compile(r'<body[^>]*>(.*?)</body>', re.DOTALL | re.IGNORECASE)
-
-# 3. <script> 태그 추출 (src 속성이 있거나, 내부 스크립트가 있는 경우 모두)
 SCRIPT_PATTERN = re.compile(r'<script.*?>.*?</script>', re.DOTALL | re.IGNORECASE)
 
-# 4. 제거할 include 구문들 (_header, _navigation)
+# 3. 불필요 요소 제거
 INCLUDE_HEADER_PATTERN = re.compile(r'{%\s*include\s*[\'"]_header\.html[\'"]\s*%}', re.IGNORECASE)
 INCLUDE_NAV_PATTERN = re.compile(r'{%\s*include\s*[\'"]_navigation\.html[\'"]\s*%}', re.IGNORECASE)
-
-# 5. 제거할 Flash Message 블록 ({% with messages ... %} ... {% endwith %})
 FLASH_MSG_PATTERN = re.compile(r'{%\s*with\s*messages\s*=\s*get_flashed_messages.*?{%\s*endwith\s*%}', re.DOTALL)
+DOCTYPE_PATTERN = re.compile(r'<!DOCTYPE html>', re.IGNORECASE)
+HTML_TAG_PATTERN = re.compile(r'<html.*?>|</html>', re.IGNORECASE)
+HEAD_TAG_PATTERN = re.compile(r'<head.*?>.*?</head>', re.DOTALL | re.IGNORECASE)
 
-# 6. 중복된 Bootstrap JS 제거용
-BOOTSTRAP_JS_PATTERN = re.compile(r'<script\s+src=[\'"].*bootstrap.*[\'"].*?>\s*</script>', re.IGNORECASE)
-
-
-# ------------------------------------------------------------------------------
-# [핵심 로직] 파일 처리 함수
-# ------------------------------------------------------------------------------
-def process_file(filepath):
-    filename = os.path.basename(filepath)
-    
+def process_file(filepath, filename):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
     except Exception as e:
-        print(f"❌ [오류] 파일 읽기 실패 ({filename}): {e}")
+        print(f"❌ [실패] 파일 읽기 오류: {filename} ({e})")
         return
 
-    # 1. 이미 작업된 파일인지 확인 (base.html 상속 여부)
-    if "{% extends" in content:
-        print(f"⏭️  [건너뜀] 이미 상속 적용됨: {filename}")
-        return
+    # [1단계] 클리닝: 기존에 잘못 적용된 Jinja 구문이나 HTML 껍데기 제거
+    # 만약 이전에 스크립트가 extends를 추가했다면 제거하고 원본 내용만 남김
+    clean_content = JINJA_EXTENDS_PATTERN.sub('', content)
+    clean_content = JINJA_BLOCK_PATTERN.sub('', clean_content)
 
-    # 2. <body> 태그 찾기 (없으면 처리 불가)
-    body_match = BODY_CONTENT_PATTERN.search(content)
-    if not body_match:
-        print(f"⚠️  [건너뜀] <body> 태그를 찾을 수 없음: {filename}")
-        return
-
-    print(f"🔄 [처리중] {filename}...", end='')
-
-    # --- 데이터 추출 시작 ---
+    # [2단계] 본문 추출
+    # <body> 태그 내부를 찾습니다.
+    body_match = BODY_CONTENT_PATTERN.search(content) # 원본 content에서 찾음 (안전)
     
-    # A. Body 속성 추출
-    #    예: <body data-url="..."> -> data-url="..."
-    attr_match = BODY_ATTR_PATTERN.search(content)
-    body_attrs = attr_match.group(1).strip() if attr_match else ""
+    if not body_match:
+        # body 태그가 없다면, 이미 정리된 파일이거나 조각 파일일 수 있음
+        # 하지만 "반영 안됨" 문제 해결을 위해 강제로 내부 내용을 찾음
+        print(f"⚠️  [주의] <body> 태그 없음. 전체 내용을 본문으로 간주: {filename}")
+        body_inner = clean_content
+        body_attrs = ""
+    else:
+        body_inner = body_match.group(1)
+        attr_match = BODY_ATTR_PATTERN.search(content)
+        body_attrs = attr_match.group(1).strip() if attr_match else ""
 
-    # B. 본문 내용 추출 (body 태그 내부의 raw HTML)
-    body_inner = body_match.group(1)
-
-    # --- 불필요한 코드 제거 (Cleaning) ---
-
-    # C. Header/Navigation Include 제거 (base.html에 이미 있음)
+    # [3단계] 불필요한 코드 제거 (헤더, 네비게이션, 플래시메시지, HTML 태그 등)
     body_inner = INCLUDE_HEADER_PATTERN.sub('', body_inner)
     body_inner = INCLUDE_NAV_PATTERN.sub('', body_inner)
-
-    # D. Flash Message 영역 제거 (base.html에 이미 있음)
     body_inner = FLASH_MSG_PATTERN.sub('', body_inner)
+    
+    # 실수로 남은 DOCTYPE, HTML, HEAD 태그 등이 body 내부에 있다면 제거
+    body_inner = DOCTYPE_PATTERN.sub('', body_inner)
+    body_inner = HTML_TAG_PATTERN.sub('', body_inner)
+    body_inner = HEAD_TAG_PATTERN.sub('', body_inner)
 
-    # E. 스크립트 분리 및 정리
+    # [4단계] 스크립트 분리
     extracted_scripts = []
-
     def script_handler(match):
-        script_tag = match.group(0)
-        # Bootstrap JS나 jQuery는 base.html에 있으므로 본문에서 삭제만 함
-        if 'bootstrap' in script_tag.lower() or 'jquery' in script_tag.lower():
+        s = match.group(0)
+        # 공통 라이브러리 스크립트는 삭제 (base.html에 있음)
+        if 'bootstrap' in s.lower() or 'jquery' in s.lower():
             return ''
-        
-        # 그 외 스크립트(커스텀 JS 등)는 리스트에 담고 본문에서 삭제
-        extracted_scripts.append(script_tag)
+        extracted_scripts.append(s)
         return ''
 
-    # 본문에서 스크립트를 찾아내고(extracted_scripts에 저장), 본문에서는 지움
     body_inner = SCRIPT_PATTERN.sub(script_handler, body_inner)
-
-    # F. 불필요한 공백 정리
     body_inner = body_inner.strip()
 
-    # --- 새로운 파일 내용 조립 (Jinja2 Template) ---
-    
-    new_content_lines = []
-    
-    # 1. 상속 선언
-    new_content_lines.append("{% extends 'base.html' %}")
-    new_content_lines.append("")
+    # [5단계] 최종 파일 내용 조립
+    new_lines = []
+    new_lines.append("{% extends 'base.html' %}")
+    new_lines.append("")
 
-    # 2. Body 속성 블록 (속성이 있을 때만 생성)
     if body_attrs:
-        new_content_lines.append("{% block body_attrs %}")
-        new_content_lines.append(body_attrs)
-        new_content_lines.append("{% endblock %}")
-        new_content_lines.append("")
+        new_lines.append("{% block body_attrs %}")
+        new_lines.append(body_attrs)
+        new_lines.append("{% endblock %}")
+        new_lines.append("")
 
-    # 3. Extra Head 블록 (필요하다면 추가, 여기서는 기본적으로 비워둠)
-    #    기존 파일 <head> 내의 특정 스타일이 있다면 수동으로 옮겨야 할 수 있음.
-    #    현재 로직은 body 내부만 처리함.
+    new_lines.append("{% block content %}")
+    new_lines.append(body_inner)
+    new_lines.append("{% endblock %}")
+    new_lines.append("")
 
-    # 4. 본문 컨텐츠 블록
-    new_content_lines.append("{% block content %}")
-    new_content_lines.append(body_inner)
-    new_content_lines.append("{% endblock %}")
-    new_content_lines.append("")
-
-    # 5. 스크립트 블록 (추출된 스크립트가 있을 때만 생성)
     if extracted_scripts:
-        new_content_lines.append("{% block scripts %}")
+        new_lines.append("{% block scripts %}")
         for script in extracted_scripts:
-            new_content_lines.append(script)
-        new_content_lines.append("{% endblock %}")
-        new_content_lines.append("")
-
-    # --- 파일 덮어쓰기 ---
-    new_file_content = "\n".join(new_content_lines)
+            new_lines.append(script)
+        new_lines.append("{% endblock %}")
     
-    try:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(new_file_content)
-        print(" 완료 ✅")
-    except Exception as e:
-        print(f" ❌ [실패] 파일 쓰기 오류: {e}")
+    # [6단계] 덮어쓰기
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write("\n".join(new_lines))
+    
+    print(f"✅ [수정완료] {filename}")
 
-
-# ------------------------------------------------------------------------------
-# [메인 실행부]
-# ------------------------------------------------------------------------------
 def main():
-    # 템플릿 디렉토리 존재 확인
     if not os.path.exists(TEMPLATE_DIR):
-        print("="*60)
-        print(f"❌ [오류] 템플릿 폴더를 찾을 수 없습니다.")
-        print(f"   경로: {os.path.abspath(TEMPLATE_DIR)}")
-        print("   >> 이 스크립트는 'flowork' 폴더가 보이는 최상위 경로에서 실행해야 합니다.")
-        print("="*60)
+        print("❌ 템플릿 폴더를 찾을 수 없습니다.")
         return
 
-    print(f"📂 템플릿 폴더 스캔 시작: {os.path.abspath(TEMPLATE_DIR)}\n")
+    # 안전을 위해 백업 생성
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
+        print(f"📦 안전 백업 생성 중... ({BACKUP_DIR})")
     
-    processed_count = 0
-    total_count = 0
-
+    count = 0
     for root, dirs, files in os.walk(TEMPLATE_DIR):
         for file in files:
             if file.endswith('.html') and file not in EXCLUDED_FILES:
-                total_count += 1
-                full_path = os.path.join(root, file)
-                process_file(full_path)
-                processed_count += 1
+                src_path = os.path.join(root, file)
+                # 백업
+                shutil.copy(src_path, os.path.join(BACKUP_DIR, file))
+                # 처리
+                process_file(src_path, file)
+                count += 1
     
-    print("\n" + "="*60)
-    print(f"✨ 작업 완료: 총 {total_count}개 파일 스캔됨.")
-    print("="*60)
+    print(f"\n✨ 총 {count}개 파일 강제 변환 완료.")
+    print(f"   혹시 문제가 생기면 '{BACKUP_DIR}' 폴더의 파일로 복구하세요.")
 
 if __name__ == '__main__':
     main()

@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-send-url="{{ url_for('api.send_mail') }}"{% endblock %}
-
 {% block content %}
+data-api-send-url="{{ url_for('api.send_mail') }}"
+
+
 <div class="container my-4">
         
         

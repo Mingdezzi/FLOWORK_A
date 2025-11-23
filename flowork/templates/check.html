@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-fetch-variant-url="{{ url_for('api.api_fetch_variant') }}"
-      data-bulk-update-actual-stock-url="{{ url_for('api.bulk_update_actual_stock') }}"{% endblock %}
-
 {% block content %}
+data-api-fetch-variant-url="{{ url_for('api.api_fetch_variant') }}"
+      data-bulk-update-actual-stock-url="{{ url_for('api.bulk_update_actual_stock') }}"
+
+
 <div class="container my-4">
         
         

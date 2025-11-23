@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-status-url="{{ url_for('api.update_repair_status', repair_id=0)[:-1] }}"{% endblock %}
-
 {% block content %}
+data-api-status-url="{{ url_for('api.update_repair_status', repair_id=0)[:-1] }}"
+
+
 <div class="container my-4">
         
         

@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-update-stock-url="{{ url_for('api.update_stock') }}"
+{% block content %}
+data-update-stock-url="{{ url_for('api.update_stock') }}"
       data-toggle-favorite-url="{{ url_for('api.toggle_favorite') }}"
       data-update-actual-stock-url="{{ url_for('api.update_actual_stock') }}"
       data-update-product-details-url="{{ url_for('api.api_update_product_details') }}"
       data-product-id="{{ product.id }}"
-      data-my-store-id="{{ my_store_id or 0 }}"{% endblock %}
+      data-my-store-id="{{ my_store_id or 0 }}"
 
-{% block content %}
+
 <div class="container my-4 {{ 'p-0' if is_partial else '' }}">
         
         {% if not is_partial %}

@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-input-mode="num"
-      data-live-search-url="{{ url_for('api.live_search') }}"
-      data-image-url-prefix="{{ IMAGE_URL_PREFIX }}"{% endblock %}
-
 {% block content %}
+data-input-mode="num"
+      data-live-search-url="{{ url_for('api.live_search') }}"
+      data-image-url-prefix="{{ IMAGE_URL_PREFIX }}"
+
+
 <div class="container my-4">
         
         

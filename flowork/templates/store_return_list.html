@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-product-search-url="{{ url_for('api.api_order_product_search') }}" 
+{% block content %}
+data-product-search-url="{{ url_for('api.api_order_product_search') }}" 
       data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
       data-api-create="{{ url_for('api.create_store_return') }}"
-      data-api-status-prefix="/api/store_returns/"{% endblock %}
+      data-api-status-prefix="/api/store_returns/"
 
-{% block content %}
+
 <div class="container my-4">
         
         

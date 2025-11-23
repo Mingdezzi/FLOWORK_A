@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-get="{{ url_for('api.get_attendance') }}" data-api-save="{{ url_for('api.save_attendance') }}"{% endblock %}
-
 {% block content %}
+data-api-get="{{ url_for('api.get_attendance') }}" data-api-save="{{ url_for('api.save_attendance') }}"
+
+
 <div class="container my-4">
         
         

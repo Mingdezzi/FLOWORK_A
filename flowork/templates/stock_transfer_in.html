@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-product-search-url="{{ url_for('api.api_order_product_search') }}" data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"{% endblock %}
-
 {% block content %}
+data-product-search-url="{{ url_for('api.api_order_product_search') }}" data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
+
+
 <div class="container my-4">
         
         

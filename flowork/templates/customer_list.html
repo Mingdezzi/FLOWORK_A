@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-list-url="{{ url_for('api.get_customers') }}" data-api-add-url="{{ url_for('api.add_customer') }}"{% endblock %}
-
 {% block content %}
+data-api-list-url="{{ url_for('api.get_customers') }}" data-api-add-url="{{ url_for('api.add_customer') }}"
+
+
 <div class="container my-4">
         
         

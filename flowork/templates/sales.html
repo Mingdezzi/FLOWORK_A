@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block extra_head %}
+{% block content %}
 <style>
     .sales-container { display: flex; gap: 20px; height: calc(100vh - 160px); }
     .sales-left { flex: 1.3; display: flex; flex-direction: column; transition: background-color 0.3s; padding: 15px; border-radius: 8px; overflow: hidden; }
@@ -41,9 +41,9 @@
         .cart-table-wrapper { max-height: 400px; }
     }
 </style>
-{% endblock %}
 
-{% block body_attrs %}
+
+
 data-api-urls='{
     "searchSalesProducts": "{{ url_for("api.search_sales_products") }}",
     "getRefundRecords": "{{ url_for("api.get_refund_records") }}",
@@ -52,9 +52,9 @@ data-api-urls='{
     "refund": "{{ url_for("api.refund_sale", sale_id=999999) }}",
     "salesSettings": "{{ url_for("api.sales_settings") }}"
 }'
-{% endblock %}
 
-{% block content %}
+
+
 <div class="sales-container">
     <div class="sales-left" id="sales-left-panel">
         <div class="mb-2">

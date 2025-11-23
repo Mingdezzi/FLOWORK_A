@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-schedule-events-url="{{ url_for('api.get_schedule_events') }}"
+{% block content %}
+data-api-schedule-events-url="{{ url_for('api.get_schedule_events') }}"
       data-api-schedule-add-url="{{ url_for('api.add_schedule_event') }}"
       data-api-schedule-update-url-prefix="{{ url_for('api.update_schedule_event', event_id=0)[:-1] }}"
-      data-api-schedule-delete-url-prefix="{{ url_for('api.delete_schedule_event', event_id=0)[:-1] }}"{% endblock %}
+      data-api-schedule-delete-url-prefix="{{ url_for('api.delete_schedule_event', event_id=0)[:-1] }}"
 
-{% block content %}
+
 <div class="container my-4">
         
         

@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
+{% block content %}
+data-product-lookup-url="{{ url_for('api.api_find_product_details') }}"
       data-product-search-url="{{ url_for('api.api_order_product_search') }}"
       data-current-color="{{ data.color or '' }}"
       data-current-size="{{ data.size or '' }}"
-      data-page-mode="{{ 'view' if is_view_mode else 'edit' }}"{% endblock %}
+      data-page-mode="{{ 'view' if is_view_mode else 'edit' }}"
 
-{% block content %}
+
 <div class="container my-4">
         
         

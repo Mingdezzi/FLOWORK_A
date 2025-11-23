@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-brand="{{ url_for('api.manage_competitor_brands') }}" data-api-sales="{{ url_for('api.get_competitor_sales') }}"{% endblock %}
-
 {% block content %}
+data-api-brand="{{ url_for('api.manage_competitor_brands') }}" data-api-sales="{{ url_for('api.get_competitor_sales') }}"
+
+
 <div class="container my-4">
         
         

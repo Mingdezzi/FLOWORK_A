@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
-{% block body_attrs %}data-api-stores-url="{{ url_for('api.get_stores') }}"
+{% block content %}
+data-api-stores-url="{{ url_for('api.get_stores') }}"
       data-api-stores-add-url="{{ url_for('api.add_store') }}"
       data-api-store-update-url-prefix="{{ url_for('api.update_store', store_id=0)[:-1] }}"
       data-api-store-delete-url-prefix="{{ url_for('api.delete_store', store_id=0)[:-1] }}"
@@ -13,9 +14,9 @@
       data-api-store-approve-url-prefix="{{ url_for('api.approve_store', store_id=0)[:-1] }}"
       data-api-store-toggle-active-url-prefix="{{ url_for('api.toggle_store_active', store_id=0)[:-1] }}"
       data-api-store-reset-url-prefix="{{ url_for('api.reset_store_registration', store_id=0)[:-1] }}"
-      data-analyze-excel-url="{{ url_for('api.analyze_excel') }}"{% endblock %}
+      data-analyze-excel-url="{{ url_for('api.analyze_excel') }}"
 
-{% block content %}
+
 <div class="container my-4">
         
         
