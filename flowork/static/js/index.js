@@ -1,4 +1,4 @@
-function imgFallback(img) {
+window.imgFallback = function(img) {
     const src = img.src;
     if (src.includes('_DF_01.jpg')) {
         img.src = src.replace('_DF_01.jpg', '_DM_01.jpg');
@@ -7,107 +7,168 @@ function imgFallback(img) {
     } else {
         img.style.visibility = 'hidden';
     }
-}
+};
 
-(function() {
-    function isMobile() {
-        const ua = navigator.userAgent;
-        return /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+let currentIndexApp = null;
+
+class IndexApp {
+    constructor() {
+        this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        this.liveSearchUrl = document.body.dataset.liveSearchUrl;
+        this.debounceTimer = null;
+        this.isKorShiftActive = false;
+
+        this.dom = {
+            searchInput: document.getElementById('search-query-input'),
+            clearTopBtn: document.getElementById('keypad-clear-top'),
+            categoryBar: document.getElementById('category-bar'),
+            categoryButtons: document.querySelectorAll('.category-btn'),
+            hiddenCategoryInput: document.getElementById('selected-category'),
+            keypadContainer: document.getElementById('keypad-container'),
+            keypadNum: document.getElementById('keypad-num'),
+            keypadKor: document.getElementById('keypad-kor'),
+            keypadEng: document.getElementById('keypad-eng'),
+            productListUl: document.getElementById('product-list-ul'),
+            listContainer: document.getElementById('product-list-view'),
+            detailContainer: document.getElementById('product-detail-view'),
+            detailIframe: document.getElementById('product-detail-iframe'),
+            backButton: document.getElementById('btn-back-to-list'),
+            productListHeader: document.getElementById('product-list-header'),
+            paginationUL: document.getElementById('search-pagination'),
+            searchForm: document.getElementById('search-form'),
+            korShiftBtn: document.querySelector('#keypad-kor [data-key="shift-kor"]')
+        };
+
+        this.korKeyMap = {
+            'ㅂ': 'ㅃ', 'ㅈ': 'ㅉ', 'ㄷ': 'ㄸ', 'ㄱ': 'ㄲ', 'ㅅ': 'ㅆ',
+            'ㅐ': 'ㅒ', 'ㅔ': 'ㅖ'
+        };
+        this.korReverseKeyMap = {
+            'ㅃ': 'ㅂ', 'ㅉ': 'ㅈ', 'ㄸ': 'ㄷ', 'ㄲ': 'ㄱ', 'ㅆ': 'ㅅ',
+            'ㅒ': 'ㅐ', 'ㅖ': 'ㅔ'
+        };
+
+        this.init();
     }
-    if (isMobile()) {
-        const searchInput = document.getElementById('search-query-input');
-        if (searchInput) {
-            searchInput.setAttribute('readonly', true);
-            searchInput.setAttribute('inputmode', 'none');
+
+    init() {
+        this.checkMobile();
+        this.bindEvents();
+        this.showKeypad('num');
+        
+        const currentCategory = this.dom.hiddenCategoryInput.value || '전체';
+        this.dom.categoryButtons.forEach(btn => {
+            if (btn.dataset.category === currentCategory) {
+                btn.classList.add('active');
+            }
+        });
+        
+        this.performSearch(1);
+    }
+
+    destroy() {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = null;
         }
     }
-})();
 
-document.addEventListener('DOMContentLoaded', (event) => {
-    
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    checkMobile() {
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isMobile && this.dom.searchInput) {
+            this.dom.searchInput.setAttribute('readonly', true);
+            this.dom.searchInput.setAttribute('inputmode', 'none');
+        }
+    }
 
-    const searchInput = document.getElementById('search-query-input');
-    const clearTopBtn = document.getElementById('keypad-clear-top');
-    
-    const categoryBar = document.getElementById('category-bar');
-    const categoryButtons = categoryBar.querySelectorAll('.category-btn');
-    const hiddenCategoryInput = document.getElementById('selected-category');
-
-    const keypadContainer = document.getElementById('keypad-container');
-    const keypadNum = document.getElementById('keypad-num');
-    const keypadKor = document.getElementById('keypad-kor');
-    const keypadEng = document.getElementById('keypad-eng');
-
-    const productListUl = document.getElementById('product-list-ul');
-    const listContainer = document.getElementById('product-list-view');
-    const detailContainer = document.getElementById('product-detail-view');
-    const detailIframe = document.getElementById('product-detail-iframe');
-    const backButton = document.getElementById('btn-back-to-list');
-
-    if (productListUl) {
-        productListUl.addEventListener('click', (e) => {
-            const link = e.target.closest('a.product-item');
-            if (link) {
-                if (window.innerWidth >= 992) {
-                    e.preventDefault(); 
-                    
+    bindEvents() {
+        if (this.dom.productListUl) {
+            this.dom.productListUl.addEventListener('click', (e) => {
+                const link = e.target.closest('a.product-item');
+                if (link && window.innerWidth >= 992) {
+                    e.preventDefault();
                     const targetUrl = link.getAttribute('href');
                     const detailUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'partial=1';
-                    
-                    if (detailIframe) {
-                        detailIframe.src = detailUrl;
-                    }
-                    
-                    if (listContainer && detailContainer) {
-                        listContainer.style.display = 'none';
-                        detailContainer.style.display = 'flex'; 
+                    if (this.dom.detailIframe) this.dom.detailIframe.src = detailUrl;
+                    if (this.dom.listContainer && this.dom.detailContainer) {
+                        this.dom.listContainer.style.display = 'none';
+                        this.dom.detailContainer.style.display = 'flex';
                     }
                 }
-            }
-        });
+            });
+        }
+
+        if (this.dom.backButton) {
+            this.dom.backButton.addEventListener('click', () => {
+                if (this.dom.listContainer && this.dom.detailContainer) {
+                    this.dom.listContainer.style.display = 'flex';
+                    this.dom.detailContainer.style.display = 'none';
+                }
+                if (this.dom.detailIframe) this.dom.detailIframe.src = 'about:blank';
+            });
+        }
+
+        if (this.dom.keypadContainer) {
+            this.dom.keypadContainer.addEventListener('click', (e) => this.handleKeypadClick(e));
+        }
+
+        if (this.dom.categoryBar) {
+            this.dom.categoryBar.addEventListener('click', (e) => {
+                const target = e.target.closest('.category-btn');
+                if (!target) return;
+                this.dom.categoryButtons.forEach(btn => btn.classList.remove('active'));
+                target.classList.add('active');
+                this.dom.hiddenCategoryInput.value = target.dataset.category;
+                this.performSearch(1);
+                this.dom.searchInput.focus();
+            });
+        }
+
+        if (this.dom.clearTopBtn) {
+            this.dom.clearTopBtn.addEventListener('click', () => {
+                this.dom.searchInput.value = '';
+                this.performSearch(1);
+                this.dom.searchInput.focus();
+            });
+        }
+
+        if (this.dom.searchInput) {
+            this.dom.searchInput.addEventListener('input', (e) => {
+                if (e.isTrusted && !e.target.readOnly) this.triggerSearch();
+            });
+            this.dom.searchInput.addEventListener('keydown', (e) => {
+                if (!e.target.readOnly && e.key === 'Enter') {
+                    clearTimeout(this.debounceTimer);
+                    this.performSearch(1);
+                }
+            });
+        }
+
+        if (this.dom.searchForm) {
+            this.dom.searchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                clearTimeout(this.debounceTimer);
+                this.performSearch(1);
+            });
+        }
     }
 
-    if (backButton) {
-        backButton.addEventListener('click', () => {
-            if (listContainer && detailContainer) {
-                listContainer.style.display = 'flex';
-                detailContainer.style.display = 'none';
-            }
-            if (detailIframe) {
-                detailIframe.src = 'about:blank'; 
-            }
-        });
-    }
-
-    let isKorShiftActive = false;
-    
-    const korKeyMap = {
-        'ㅂ': 'ㅃ', 'ㅈ': 'ㅉ', 'ㄷ': 'ㄸ', 'ㄱ': 'ㄲ', 'ㅅ': 'ㅆ',
-        'ㅐ': 'ㅒ', 'ㅔ': 'ㅖ'
-    };
-    const korReverseKeyMap = {
-        'ㅃ': 'ㅂ', 'ㅉ': 'ㅈ', 'ㄸ': 'ㄷ', 'ㄲ': 'ㄱ', 'ㅆ': 'ㅅ',
-        'ㅒ': 'ㅐ', 'ㅖ': 'ㅔ'
-    };
-    const korShiftBtn = document.querySelector('#keypad-kor [data-key="shift-kor"]');
-
-    function updateKorKeypadVisuals() {
-        if (isKorShiftActive) {
-            korShiftBtn.classList.add('active', 'btn-primary');
-            korShiftBtn.classList.remove('btn-outline-secondary');
-            for (const [base, shifted] of Object.entries(korKeyMap)) {
-                const keyEl = document.querySelector(`#keypad-kor [data-key="${base}"]`);
+    updateKorKeypadVisuals() {
+        if (this.isKorShiftActive) {
+            this.dom.korShiftBtn.classList.add('active', 'btn-primary');
+            this.dom.korShiftBtn.classList.remove('btn-outline-secondary');
+            for (const [base, shifted] of Object.entries(this.korKeyMap)) {
+                const keyEl = this.dom.keypadKor.querySelector(`[data-key="${base}"]`);
                 if (keyEl) {
                     keyEl.dataset.key = shifted;
                     keyEl.textContent = shifted;
                 }
             }
         } else {
-            korShiftBtn.classList.remove('active', 'btn-primary');
-            korShiftBtn.classList.add('btn-outline-secondary');
-            for (const [shifted, base] of Object.entries(korReverseKeyMap)) {
-                const keyEl = document.querySelector(`#keypad-kor [data-key="${shifted}"]`);
+            this.dom.korShiftBtn.classList.remove('active', 'btn-primary');
+            this.dom.korShiftBtn.classList.add('btn-outline-secondary');
+            for (const [shifted, base] of Object.entries(this.korReverseKeyMap)) {
+                const keyEl = this.dom.keypadKor.querySelector(`[data-key="${shifted}"]`);
                 if (keyEl) {
                     keyEl.dataset.key = base;
                     keyEl.textContent = base;
@@ -116,102 +177,87 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
     }
 
-    function showKeypad(mode) {
-        keypadNum.classList.add('keypad-hidden');
-        keypadKor.classList.add('keypad-hidden');
-        keypadEng.classList.add('keypad-hidden');
+    showKeypad(mode) {
+        this.dom.keypadNum.classList.add('keypad-hidden');
+        this.dom.keypadKor.classList.add('keypad-hidden');
+        this.dom.keypadEng.classList.add('keypad-hidden');
 
         if (mode === 'kor') {
-            keypadKor.classList.remove('keypad-hidden');
+            this.dom.keypadKor.classList.remove('keypad-hidden');
             document.body.dataset.inputMode = 'kor';
         } else if (mode === 'eng') {
-            keypadEng.classList.remove('keypad-hidden');
+            this.dom.keypadEng.classList.remove('keypad-hidden');
             document.body.dataset.inputMode = 'eng';
         } else {
-            keypadNum.classList.remove('keypad-hidden');
+            this.dom.keypadNum.classList.remove('keypad-hidden');
             document.body.dataset.inputMode = 'num';
         }
     }
-    
-    if (keypadContainer) {
-        keypadContainer.addEventListener('click', (e) => {
-            const key = e.target.closest('.keypad-btn, .qwerty-key');
-            if (!key) return;
 
-            const dataKey = key.dataset.key;
-            if (!dataKey) return;
+    handleKeypadClick(e) {
+        const key = e.target.closest('.keypad-btn, .qwerty-key');
+        if (!key) return;
 
+        const dataKey = key.dataset.key;
+        if (!dataKey) return;
 
-            if (dataKey === 'backspace') {
-                let currentValue = searchInput.value;
-                if (currentValue.length > 0) {
-                    searchInput.value = currentValue.slice(0, -1);
-                }
-                triggerSearch(); 
-            } 
-            else if (dataKey === 'mode-kor') {
-                showKeypad('kor');
-            } 
-            else if (dataKey === 'mode-eng') {
-                showKeypad('eng');
-                if (isKorShiftActive) {
-                    isKorShiftActive = false;
-                    updateKorKeypadVisuals();
-                }
-            } 
-            else if (dataKey === 'mode-num') {
-                showKeypad('num');
-                if (isKorShiftActive) {
-                    isKorShiftActive = false;
-                    updateKorKeypadVisuals();
-                }
+        if (dataKey === 'backspace') {
+            let currentValue = this.dom.searchInput.value;
+            if (currentValue.length > 0) {
+                this.dom.searchInput.value = currentValue.slice(0, -1);
             }
-            else if (dataKey === 'shift-kor') {
-                isKorShiftActive = !isKorShiftActive;
-                updateKorKeypadVisuals();
+            this.triggerSearch();
+        } else if (dataKey === 'mode-kor') {
+            this.showKeypad('kor');
+        } else if (dataKey === 'mode-eng') {
+            this.showKeypad('eng');
+            if (this.isKorShiftActive) {
+                this.isKorShiftActive = false;
+                this.updateKorKeypadVisuals();
             }
-            else if (dataKey === 'shift-eng') {
+        } else if (dataKey === 'mode-num') {
+            this.showKeypad('num');
+            if (this.isKorShiftActive) {
+                this.isKorShiftActive = false;
+                this.updateKorKeypadVisuals();
             }
-            else if (dataKey === ' ') {
-                searchInput.value += ' ';
-                triggerSearch(); 
+        } else if (dataKey === 'shift-kor') {
+            this.isKorShiftActive = !this.isKorShiftActive;
+            this.updateKorKeypadVisuals();
+        } else if (dataKey === 'shift-eng') {
+        } else if (dataKey === ' ') {
+            this.dom.searchInput.value += ' ';
+            this.triggerSearch();
+        } else {
+            if (window.Hangul) {
+                this.dom.searchInput.value = Hangul.assemble(this.dom.searchInput.value + dataKey);
+            } else {
+                this.dom.searchInput.value += dataKey;
             }
-            else {
-                searchInput.value = Hangul.assemble(searchInput.value + dataKey);
-                triggerSearch(); 
-            }
-            
-            searchInput.focus();
-        });
+            this.triggerSearch();
+        }
+        this.dom.searchInput.focus();
     }
 
-
-    const productListHeader = document.getElementById('product-list-header');
-    const paginationUL = document.getElementById('search-pagination');
-    
-    const liveSearchUrl = document.body.dataset.liveSearchUrl;
-
-    let debounceTimer;
-
-    function triggerSearch() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { performSearch(1); }, 300);
+    triggerSearch() {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => { this.performSearch(1); }, 300);
     }
 
-    const performSearch = async (page = 1) => {
-        const query = searchInput.value;
-        const category = hiddenCategoryInput.value;
+    async performSearch(page = 1) {
+        const query = this.dom.searchInput.value;
+        const category = this.dom.hiddenCategoryInput.value;
         const perPage = 10;
 
-        productListUl.innerHTML = '<li class="list-group-item text-center text-muted p-4">검색 중...</li>';
-        paginationUL.innerHTML = '';
+        this.dom.productListUl.innerHTML = '<li class="list-group-item text-center text-muted p-4">검색 중...</li>';
+        this.dom.paginationUL.innerHTML = '';
 
         try {
-            const response = await fetch(liveSearchUrl, {
+            const response = await fetch(this.liveSearchUrl, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
+                    'X-CSRFToken': this.csrfToken
                 },
                 body: JSON.stringify({ 
                     query: query, 
@@ -224,39 +270,39 @@ document.addEventListener('DOMContentLoaded', (event) => {
             const data = await response.json();
             
             if (data.status === 'success') {
-                if (listContainer && detailContainer) {
-                    listContainer.style.display = 'flex';
-                    detailContainer.style.display = 'none';
+                if (this.dom.listContainer && this.dom.detailContainer) {
+                    this.dom.listContainer.style.display = 'flex';
+                    this.dom.detailContainer.style.display = 'none';
                 }
-                if (detailIframe) {
-                    detailIframe.src = 'about:blank';
+                if (this.dom.detailIframe) {
+                    this.dom.detailIframe.src = 'about:blank';
                 }
 
-                renderResults(data.products, data.showing_favorites, data.selected_category);
-                renderPagination(data.total_pages, data.current_page);
+                this.renderResults(data.products, data.showing_favorites, data.selected_category);
+                this.renderPagination(data.total_pages, data.current_page);
             } else { 
                 throw new Error(data.message || 'API error'); 
             }
         } catch (error) {
             console.error('실시간 검색 오류:', error);
-            productListUl.innerHTML = '<li class="list-group-item text-center text-danger p-4">검색 중 오류가 발생했습니다.</li>';
+            this.dom.productListUl.innerHTML = '<li class="list-group-item text-center text-danger p-4">검색 중 오류가 발생했습니다.</li>';
         }
-    };
-    
-    const renderResults = (products, showingFavorites, selectedCategory) => {
-         if (showingFavorites) {
-            productListHeader.innerHTML = '<i class="bi bi-star-fill me-2 text-warning"></i>즐겨찾기 목록';
+    }
+
+    renderResults(products, showingFavorites, selectedCategory) {
+        if (showingFavorites) {
+            this.dom.productListHeader.innerHTML = '<i class="bi bi-star-fill me-2 text-warning"></i>즐겨찾기 목록';
         } else {
             let categoryBadge = '';
             if (selectedCategory && selectedCategory !== '전체') {
                 categoryBadge = `<span class="badge bg-success ms-2">${selectedCategory}</span>`;
             }
-            productListHeader.innerHTML = `<i class="bi bi-card-list me-2"></i>상품 검색 결과 ${categoryBadge}`;
+            this.dom.productListHeader.innerHTML = `<i class="bi bi-card-list me-2"></i>상품 검색 결과 ${categoryBadge}`;
         }
-        productListUl.innerHTML = '';
+        this.dom.productListUl.innerHTML = '';
         if (products.length === 0) {
             const message = showingFavorites ? '즐겨찾기 상품 없음.' : '검색된 상품 없음.';
-            productListUl.innerHTML = `<li class="list-group-item text-center text-muted p-4">${message}</li>`;
+            this.dom.productListUl.innerHTML = `<li class="list-group-item text-center text-muted p-4">${message}</li>`;
             return;
         }
         products.forEach(product => {
@@ -276,12 +322,12 @@ document.addEventListener('DOMContentLoaded', (event) => {
                     </a>
                 </li>
             `;
-            productListUl.insertAdjacentHTML('beforeend', productHtml);
+            this.dom.productListUl.insertAdjacentHTML('beforeend', productHtml);
         });
-    };
+    }
 
-    const renderPagination = (totalPages, currentPage) => {
-        paginationUL.innerHTML = '';
+    renderPagination(totalPages, currentPage) {
+        this.dom.paginationUL.innerHTML = '';
         if (totalPages <= 1) return;
 
         const createPageItem = (pageNum, text, isActive = false, isDisabled = false) => {
@@ -296,7 +342,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
             if (!isDisabled && !isActive) {
                 a.addEventListener('click', (e) => {
                     e.preventDefault();
-                    performSearch(pageNum);
+                    this.performSearch(pageNum);
                 });
             }
             
@@ -304,7 +350,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
             return li;
         };
 
-        paginationUL.appendChild(createPageItem(currentPage - 1, '«', false, currentPage === 1));
+        this.dom.paginationUL.appendChild(createPageItem(currentPage - 1, '«', false, currentPage === 1));
 
         let startPage = Math.max(1, currentPage - 2);
         let endPage = Math.min(totalPages, currentPage + 2);
@@ -315,69 +361,25 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
 
         for (let i = startPage; i <= endPage; i++) {
-            paginationUL.appendChild(createPageItem(i, i, i === currentPage));
+            this.dom.paginationUL.appendChild(createPageItem(i, i, i === currentPage));
         }
 
-        paginationUL.appendChild(createPageItem(currentPage + 1, '»', false, currentPage === totalPages));
-    };
+        this.dom.paginationUL.appendChild(createPageItem(currentPage + 1, '»', false, currentPage === totalPages));
+    }
+}
 
-    if (categoryBar) {
-        categoryBar.addEventListener('click', (e) => {
-            const target = e.target.closest('.category-btn');
-            if (!target) return;
-
-            categoryButtons.forEach(btn => btn.classList.remove('active'));
-            target.classList.add('active');
-            hiddenCategoryInput.value = target.dataset.category;
-            performSearch(1); 
-            searchInput.focus();
-        });
-    }
-
-    if (clearTopBtn) {
-        clearTopBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            performSearch(1);
-            searchInput.focus();
-        });
-    }
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            if (e.isTrusted && !e.target.readOnly) { 
-                triggerSearch();
-            }
-        });
-        
-         searchInput.addEventListener('keydown', (e) => {
-             if (e.target.readOnly) return;
-             
-            if (e.key === 'Backspace') {
-            } else if (e.key === 'Enter') {
-                 clearTimeout(debounceTimer);
-                 performSearch(1);
-             }
-        });
-    }
-    
-    const searchForm = document.getElementById('search-form');
-    if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            clearTimeout(debounceTimer);
-            performSearch(1);
-        });
-    }
-    
-    showKeypad('num');
-    
-    const currentCategory = hiddenCategoryInput.value || '전체';
-    categoryButtons.forEach(btn => {
-        if (btn.dataset.category === currentCategory) {
-            btn.classList.add('active');
+document.addEventListener('turbo:load', () => {
+    if (document.getElementById('search-query-input')) {
+        if (currentIndexApp) {
+            currentIndexApp.destroy();
         }
-    });
-    
-    performSearch(1);
+        currentIndexApp = new IndexApp();
+    }
+});
 
+document.addEventListener('turbo:before-cache', () => {
+    if (currentIndexApp) {
+        currentIndexApp.destroy();
+        currentIndexApp = null;
+    }
 });

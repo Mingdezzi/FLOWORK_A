@@ -1,7 +1,4 @@
-/**
- * Order Management Logic
- * Refactored to use Class-based structure and Common Utilities
- */
+let currentOrderApp = null;
 
 class OrderApp {
     constructor() {
@@ -40,6 +37,7 @@ class OrderApp {
             size: document.body.dataset.currentSize
         };
 
+        this.boundDocumentClick = this.handleDocumentClick.bind(this);
         this.init();
     }
 
@@ -74,17 +72,10 @@ class OrderApp {
             this.dom.pnInput.addEventListener('keydown', (e) => {
                 if(e.key === 'Enter') { e.preventDefault(); this.dom.btnSearch.click(); }
             });
-            // 초기 로드 시 값이 있으면 조회
             if(this.dom.pnInput.value) this.fetchProductOptions(this.dom.pnInput.value);
         }
 
-        // 상품 검색 결과창 닫기
-        document.addEventListener('click', (e) => {
-            if(this.dom.pnInput) {
-                const container = this.dom.pnInput.closest('.position-relative');
-                if(container && !container.contains(e.target)) this.dom.resultsDiv.style.display = 'none';
-            }
-        });
+        document.addEventListener('click', this.boundDocumentClick);
 
         if(this.dom.btnAddRow) this.dom.btnAddRow.addEventListener('click', () => this.addProcessingRow());
         if(this.dom.processingBody) {
@@ -116,6 +107,17 @@ class OrderApp {
 
         this.toggleAddressFields();
         this.toggleStatusFields();
+    }
+
+    handleDocumentClick(e) {
+        if(this.dom.pnInput) {
+            const container = this.dom.pnInput.closest('.position-relative');
+            if(container && !container.contains(e.target)) this.dom.resultsDiv.style.display = 'none';
+        }
+    }
+
+    destroy() {
+        document.removeEventListener('click', this.boundDocumentClick);
     }
 
     toggleAddressFields() {
@@ -228,14 +230,12 @@ class OrderApp {
     }
 
     validateForm(e) {
-        // 수령 방법 검증
         const selected = this.dom.receptionToggles.querySelector('input:checked');
         if(selected && selected.value === '택배수령') {
             if(!document.getElementById('address1').value) {
                 e.preventDefault(); alert('주소를 입력해주세요.'); return;
             }
         }
-        // 처리 내역 검증
         const selects = this.dom.processingBody.querySelectorAll('select[name="processing_source"]');
         for(let s of selects) {
             if(!s.value) {
@@ -245,4 +245,18 @@ class OrderApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => new OrderApp());
+document.addEventListener('turbo:load', () => {
+    if (document.getElementById('order-form')) {
+        if (currentOrderApp) {
+            currentOrderApp.destroy();
+        }
+        currentOrderApp = new OrderApp();
+    }
+});
+
+document.addEventListener('turbo:before-cache', () => {
+    if (currentOrderApp) {
+        currentOrderApp.destroy();
+        currentOrderApp = null;
+    }
+});

@@ -1,14 +1,14 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let calendar = null;
 
-    // --- 1. DOM 요소 및 API URL 가져오기 ---
+document.addEventListener('turbo:load', async () => {
+    const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+    if (!csrfTokenMeta) return;
+    const csrfToken = csrfTokenMeta.getAttribute('content');
+
     const calendarEl = document.getElementById('calendar');
     const eventModalEl = document.getElementById('event-modal');
-    if (!calendarEl || !eventModalEl) {
-        console.error("필수 요소(calendar, event-modal)가 없습니다.");
-        return;
-    }
+    
+    if (!calendarEl || !eventModalEl) return;
 
     const eventModal = new bootstrap.Modal(eventModalEl);
     const bodyData = document.body.dataset;
@@ -34,21 +34,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const deleteButton = document.getElementById('btn-delete-event');
     const modalStatus = document.getElementById('event-modal-status');
 
-    // [수정] 서버 API에서 공휴일 정보 동적 로드
     let HOLIDAYS = {};
     try {
         const response = await fetch('/api/holidays');
         if (response.ok) {
             HOLIDAYS = await response.json();
-        } else {
-            console.warn('Failed to fetch holidays');
         }
     } catch (error) {
-        console.error('Error fetching holidays:', error);
+        console.error(error);
     }
 
-    // --- 2. FullCalendar 초기화 ---
-    const calendar = new FullCalendar.Calendar(calendarEl, {
+    calendar = new FullCalendar.Calendar(calendarEl, {
         locale: 'ko', 
         initialView: 'dayGridMonth', 
         headerToolbar: {
@@ -66,15 +62,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         events: apiUrls.fetch,
 
-        // 날짜 셀 렌더링 시 공휴일/주말 처리
         dayCellDidMount: function(info) {
             const dateStr = info.date.toISOString().split('T')[0];
-            const dayOfWeek = info.date.getDay(); // 0: 일, 6: 토
+            const dayOfWeek = info.date.getDay();
             const holidayName = HOLIDAYS[dateStr];
             
             const dayNumberEl = info.el.querySelector('.fc-daygrid-day-number');
             
-            // 주말(토,일) 또는 공휴일이면 텍스트 붉은색 처리
             if (dayOfWeek === 0 || dayOfWeek === 6 || holidayName) {
                 if (dayNumberEl) {
                     dayNumberEl.style.color = '#dc3545'; 
@@ -82,7 +76,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            // 공휴일 명칭 표시
             if (holidayName) {
                 const holidayEl = document.createElement('div');
                 holidayEl.textContent = holidayName;
@@ -140,8 +133,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     calendar.render();
-
-    // --- 3. 모달 이벤트 핸들러 ---
 
     eventAllDaySwitch.addEventListener('change', toggleAllDayFields);
 
@@ -289,4 +280,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     eventModalEl.addEventListener('hidden.bs.modal', resetModal);
+});
+
+document.addEventListener('turbo:before-cache', () => {
+    if (calendar) {
+        calendar.destroy();
+        calendar = null;
+    }
 });
