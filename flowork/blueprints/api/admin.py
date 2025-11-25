@@ -5,7 +5,7 @@ from flask import request, jsonify, current_app, flash, redirect, url_for, abort
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func, exc
 
-from flowork.models import db, Brand, Store, Setting, User, Staff, Announcement, Sale, StockHistory
+from flowork.models import db, Brand, Store, Setting, User, Staff, Sale, StockHistory
 from . import api_bp
 from .utils import admin_required
 
@@ -67,11 +67,9 @@ def upload_brand_logo():
         return jsonify({'status': 'error', 'message': '선택된 파일이 없습니다.'}), 400
 
     try:
-        # [수정] 로고 저장 경로를 Worker와 공유되는 'product_images' 폴더로 변경
         static_folder = os.path.join(current_app.root_path, 'static', 'product_images')
         os.makedirs(static_folder, exist_ok=True)
         
-        # 썸네일 생성 전용 로고 파일명으로 저장
         file_path = os.path.join(static_folder, 'thumbnail_logo.png')
         file.save(file_path)
         

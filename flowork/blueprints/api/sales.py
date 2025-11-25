@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func, or_
 import openpyxl
 
-from flowork.models import db, Sale, SaleItem, Setting, StoreStock, Variant, Product, Store, StockHistory
+from flowork.models import db, Sale, SaleItem, Setting, StoreStock, Variant, Product
 from flowork.utils import clean_string_upper, get_sort_key
 from flowork.services.sales_service import SalesService
 from . import api_bp
@@ -51,7 +51,6 @@ def create_sale():
     
     if not items: return jsonify({'status': 'error', 'message': '상품 없음'}), 400
     
-    # 서비스 호출로 위임
     result = SalesService.create_sale(
         store_id=current_user.store_id,
         user_id=current_user.id,
@@ -363,7 +362,6 @@ def export_daily_sales():
 def refund_sale(sale_id):
     if not current_user.store_id: return jsonify({'status': 'error'}), 403
     
-    # 서비스 호출로 위임
     result = SalesService.refund_sale_full(sale_id, current_user.store_id, current_user.id)
     
     status_code = 200 if result['status'] == 'success' else 500
@@ -380,7 +378,6 @@ def refund_sale_partial(sale_id):
     if not refund_items:
         return jsonify({'status': 'error', 'message': '환불할 상품이 없습니다.'}), 400
 
-    # 서비스 호출로 위임
     result = SalesService.refund_sale_partial(sale_id, current_user.store_id, current_user.id, refund_items)
     
     status_code = 200 if result['status'] == 'success' else 500
