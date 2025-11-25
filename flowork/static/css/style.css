@@ -13,42 +13,55 @@
 }
 
 /* =========================================
-   1. 기본 레이아웃 및 탭 시스템 (Shell)
+   1. 기본 레이아웃 (Shell) - 스크롤 제어 핵심
    ========================================= */
+
+/* [핵심] 브라우저 전체(Base) 스크롤 제거 */
 html, body {
+    width: 100%;
     height: 100%;
-    overflow: hidden; /* 탭 시스템에서는 메인 스크롤을 없앱니다 */
+    margin: 0;
+    padding: 0;
+    overflow: hidden !important; /* 바깥쪽 스크롤 강제 차단 */
     font-family: var(--font-family);
 }
 
-/* 전체 래퍼 */
+/* 전체 래퍼: 화면 꽉 채우고 내부 스크롤 없음 */
 .main-wrapper {
     display: flex;
-    height: 100vh;
-    width: 100vw;
+    width: 100%;
+    height: 100vh; /* 뷰포트 높이 100% 고정 */
     background-color: #f5f7f9;
+    overflow: hidden; /* 래퍼 자체 스크롤 차단 */
 }
 
 /* 사이드바 영역 */
 .sidebar-area {
     width: var(--sidebar-width);
+    height: 100%; /* 높이 꽉 채움 */
     background-color: #fff;
     border-right: 1px solid var(--bs-border-color);
     display: flex;
     flex-direction: column;
     z-index: 1000;
-    transition: transform 0.3s ease;
+    flex-shrink: 0; /* 사이드바 줄어들지 않음 */
 }
 
-/* 메인 컨텐츠 영역 */
+/* 메인 컨텐츠 영역 (우측) */
 .content-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    height: 100%; /* 높이 꽉 채움 */
+    min-width: 0; /* Flexbox 오버플로우 방지 */
+    overflow: hidden; /* 컨텐츠 영역 자체 스크롤 차단 */
     position: relative;
     background-color: #f5f7f9;
 }
+
+/* =========================================
+   2. 탭 시스템 및 내부 스크롤
+   ========================================= */
 
 /* 상단 탭 바 */
 .tab-bar-container {
@@ -58,6 +71,7 @@ html, body {
     display: flex;
     align-items: center;
     padding: 0 10px;
+    flex-shrink: 0; /* 탭 바 높이 고정 */
     overflow-x: auto;
     overflow-y: hidden;
     white-space: nowrap;
@@ -131,20 +145,22 @@ html, body {
 
 /* 탭 컨텐츠 컨테이너 (Iframe 영역) */
 .tab-content-container {
-    flex: 1;
+    flex: 1; /* 남은 공간 모두 차지 */
     position: relative;
     background-color: #f5f7f9;
     padding: 0;
-    overflow: hidden;
+    overflow: hidden; /* 컨테이너 자체 스크롤 차단 */
+    height: 100%; /* 높이 명시 */
 }
 
+/* [핵심] 실제 내용이 들어가는 영역 */
 .tab-pane {
     display: none;
     width: 100%;
     height: 100%;
-    /* [핵심 수정] 컨텐츠가 길어지면 이 영역 안에서만 스크롤 생성 */
-    overflow-y: auto;
-    /* 모바일 터치 스크롤 부드럽게 */
+    /* 여기서만 스크롤 생기도록 설정 */
+    overflow-y: auto; 
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -160,17 +176,18 @@ html, body {
 }
 
 /* =========================================
-   2. 공통 UI 컴포넌트 (디자인 통일)
+   3. Iframe 내부 모드 (알맹이) 스타일
    ========================================= */
 
 /* Iframe 내부 페이지 모드 */
 body.iframe-mode {
     background-color: #f5f7f9;
-    overflow-y: auto;
+    /* 내부 스크롤 허용 */
+    overflow-y: auto !important; 
     padding-bottom: 20px;
 }
 
-/* Iframe 내부에서는 사이드바/네비게이션/탭바 숨김 */
+/* Iframe 내부에서는 껍데기 요소 숨김 */
 body.iframe-mode .sidebar-desktop,
 body.iframe-mode .mobile-top-header,
 body.iframe-mode .bottom-tab-bar,
@@ -179,23 +196,30 @@ body.iframe-mode .tab-bar-container {
     display: none !important;
 }
 
+/* Iframe 내부 상단 여백 제거 */
 body.iframe-mode .main-content-wrapper {
     margin-left: 0 !important;
-    /* [수정] 상단 패딩을 0으로 변경하여 위쪽 여백 제거 */
-    padding: 0 1rem 1rem 1rem !important;
+    padding: 0 1rem 1rem 1rem !important; /* padding-top: 0 */
+    height: auto !important; /* Iframe 내부는 auto로 설정하여 내용만큼 늘어남 */
     min-height: auto !important;
     background-color: transparent;
+    display: block !important; /* flex 해제 */
+    overflow: visible !important; /* 내용 잘림 방지 */
 }
 
-/* [추가] Iframe 내부의 모든 컨테이너 상단 여백 강제 제거 */
+/* Iframe 내부 컨테이너 여백 제거 */
 body.iframe-mode .container, 
 body.iframe-mode .container-fluid {
-    margin-top: 0 !important;      /* my-4 클래스로 인한 여백 제거 */
-    padding-top: 10px !important;  /* 최소한의 여백 (필요시 0으로 수정 가능) */
+    margin-top: 0 !important;
+    padding-top: 10px !important;
     max-width: 100% !important;
     padding-left: 10px !important;
     padding-right: 10px !important;
 }
+
+/* =========================================
+   4. 공통 UI 컴포넌트 (디자인 통일)
+   ========================================= */
 
 /* 카드 스타일 통일 */
 .card {
@@ -290,7 +314,7 @@ body.iframe-mode .container-fluid {
     border-radius: 0.25rem;
 }
 
-/* 컨테이너 여백 제거 (일반 모드용 기본값) */
+/* 컨테이너 여백 기본값 */
 .container, .container-fluid {
     padding-left: 0 !important;
     padding-right: 0 !important;
@@ -298,7 +322,7 @@ body.iframe-mode .container-fluid {
 }
 
 /* =========================================
-   3. 페이지별 고유 스타일 (기존 기능 유지)
+   5. 페이지별 고유 스타일
    ========================================= */
 
 /* 판매 관리 (Sales) 페이지 */
@@ -341,7 +365,6 @@ body.iframe-mode .container-fluid {
     .main-wrapper { flex-direction: column; }
     .tab-bar-container { display: none; } /* 모바일에서는 탭 바 숨김 */
     
-    /* 모바일에서는 Iframe 모드라도 헤더/하단탭 표시 (단독 실행 시) */
     body.iframe-mode .mobile-top-header { display: flex !important; }
     body.iframe-mode .bottom-tab-bar { display: flex !important; }
     
@@ -362,7 +385,7 @@ body.iframe-mode .container-fluid {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.1); border-radius: 3px; }
 
-/* 사이드바 메뉴 스타일 (기존 유지하되 변수 적용) */
+/* 사이드바 메뉴 스타일 */
 .sidebar-desktop .accordion-button { background-color: transparent; color: #495057; padding: 1rem 1.25rem; font-size: 0.95rem; }
 .sidebar-desktop .accordion-button:not(.collapsed) { color: var(--bs-primary); background-color: #fff5f5; box-shadow: none; }
 .sidebar-desktop .list-group-item { border: none; font-size: 0.9rem; color: #6c757d; padding-top: 0.6rem; padding-bottom: 0.6rem; }
