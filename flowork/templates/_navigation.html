@@ -1,11 +1,20 @@
-<div class="list-group list-group-flush border-bottom mb-2">
-    <a href="{{ url_for('ui.sales_register') }}" class="list-group-item list-group-item-action fw-bold {{ 'active text-primary' if active_page == 'sales' else 'text-dark' }}">
-        <i class="bi bi-cart-plus me-2"></i>판매등록
-    </a>
-</div>
+<style>
+    /* 단독 메뉴(링크)인 경우 아코디언 화살표 숨김 */
+    .accordion-button.no-toggle::after {
+        display: none !important;
+    }
+</style>
 
 <div class="accordion accordion-flush" id="navAccordion">
     
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <a href="{{ url_for('ui.sales_register') }}" class="accordion-button no-toggle {{ 'collapsed' if active_page != 'sales' else '' }} fw-bold text-decoration-none" style="box-shadow: none;">
+                <i class="bi bi-cart-plus me-2"></i> 판매등록
+            </a>
+        </h2>
+    </div>
+
     <div class="accordion-item">
         <h2 class="accordion-header">
             <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#menu-sales-mgmt">
@@ -32,7 +41,7 @@
             <div class="accordion-body p-0">
                 <div class="list-group list-group-flush">
                     <a href="{{ url_for('ui.online_management') }}" class="list-group-item list-group-item-action small ps-4 {{ 'active' if active_page == 'online_mgmt' else '' }}">품번관리</a>
-                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -151,7 +160,7 @@
                 <div class="list-group list-group-flush">
                     <a href="{{ url_for('ui.stock_management') }}" class="list-group-item list-group-item-action small ps-4 {{ 'active' if active_page == 'stock' else '' }}">재고설정</a>
                     <a href="{{ url_for('ui.setting_page') }}" class="list-group-item list-group-item-action small ps-4 {{ 'active' if active_page == 'setting' else '' }}">일반설정</a>
-                    </div>
+                </div>
             </div>
         </div>
     </div>
