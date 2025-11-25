@@ -166,19 +166,31 @@ body.iframe-mode {
     padding-bottom: 20px;
 }
 
-/* Iframe 내부에서는 사이드바/네비게이션 숨김 */
+/* Iframe 내부에서는 사이드바/네비게이션/탭바 숨김 */
 body.iframe-mode .sidebar-desktop,
 body.iframe-mode .mobile-top-header,
 body.iframe-mode .bottom-tab-bar,
-body.iframe-mode .offcanvas {
+body.iframe-mode .offcanvas,
+body.iframe-mode .tab-bar-container {
     display: none !important;
 }
 
 body.iframe-mode .main-content-wrapper {
     margin-left: 0 !important;
-    padding: 1rem !important;
+    /* 상단 패딩을 0으로 변경하여 위쪽 여백 제거 */
+    padding: 0 1rem 1rem 1rem !important;
     min-height: auto !important;
     background-color: transparent;
+}
+
+/* Iframe 내부의 모든 컨테이너 상단 여백 강제 제거 */
+body.iframe-mode .container, 
+body.iframe-mode .container-fluid {
+    margin-top: 0 !important;      /* my-4 클래스로 인한 여백 제거 */
+    padding-top: 10px !important;  /* 최소한의 여백 */
+    max-width: 100% !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
 }
 
 /* 카드 스타일 통일 */
@@ -274,7 +286,7 @@ body.iframe-mode .main-content-wrapper {
     border-radius: 0.25rem;
 }
 
-/* 컨테이너 여백 제거 (Iframe 내부용) */
+/* 컨테이너 여백 제거 (일반 모드용 기본값) */
 .container, .container-fluid {
     padding-left: 0 !important;
     padding-right: 0 !important;
