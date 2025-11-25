@@ -15,6 +15,7 @@
     .bottom-tab-bar .nav-link {
         padding-top: 8px;
         padding-bottom: 4px;
+        border-radius: 0; /* Journal 테마: 각진 모서리 */
     }
 </style>
 
@@ -23,28 +24,28 @@
         <div class="row w-100 mx-0 text-center">
             
             <div class="col px-0">
-                <a href="{{ url_for('ui.sales_register') }}" class="nav-link {{ 'active text-primary' if active_page == 'sales' else 'text-secondary' }}">
+                <a href="{{ url_for('ui.sales_register') }}" class="nav-link {{ 'active text-primary fw-bold' if active_page == 'sales' else 'text-secondary' }}">
                     <i class="bi bi-cart-plus fs-4 d-block mb-0"></i>
                     <span style="font-size: 10px;">판매등록</span>
                 </a>
             </div>
 
             <div class="col px-0">
-                <a href="{{ url_for('ui.search_page') }}" class="nav-link {{ 'active text-primary' if active_page == 'search' else 'text-secondary' }}">
+                <a href="{{ url_for('ui.search_page') }}" class="nav-link {{ 'active text-primary fw-bold' if active_page == 'search' else 'text-secondary' }}">
                     <i class="bi bi-search fs-4 d-block mb-0"></i>
                     <span style="font-size: 10px;">상품검색</span>
                 </a>
             </div>
 
             <div class="col px-0">
-                <a href="{{ url_for('ui.home') }}" class="nav-link {{ 'active text-primary' if active_page == 'home' else 'text-secondary' }}">
+                <a href="{{ url_for('ui.home') }}" class="nav-link {{ 'active text-primary fw-bold' if active_page == 'home' else 'text-secondary' }}">
                     <i class="bi bi-house-door-fill fs-3 d-block mb-0"></i>
                     <span style="font-size: 10px; font-weight:bold;">홈</span>
                 </a>
             </div>
 
             <div class="col px-0">
-                <a href="{{ url_for('ui.mail_box') }}" class="nav-link {{ 'active text-primary' if active_page == 'mail' else 'text-secondary' }}">
+                <a href="{{ url_for('ui.mail_box') }}" class="nav-link {{ 'active text-primary fw-bold' if active_page == 'mail' else 'text-secondary' }}">
                     <i class="bi bi-envelope fs-4 d-block mb-0"></i>
                     <span style="font-size: 10px;">점간메일</span>
                 </a>
