@@ -8,10 +8,13 @@ class StockApp {
         };
         
         this.pollingInterval = null;
+        
+        console.log("StockApp Initialized"); // 디버깅용 로그
         this.init();
     }
 
     init() {
+        // 각 업로드 폼 설정
         const configs = [
             {
                 fileInputId: 'store_stock_excel_file',
@@ -38,6 +41,7 @@ class StockApp {
 
         configs.forEach(config => this.setupExcelAnalyzer(config));
 
+        // 가로형 모드 스위치
         if (this.dom.horizontalSwitches) {
             this.dom.horizontalSwitches.forEach(sw => {
                 sw.addEventListener('change', (e) => this.toggleHorizontalMode(e.target));
@@ -78,11 +82,16 @@ class StockApp {
         const statusText = document.getElementById(statusId);
         const grid = document.getElementById(gridId);
         
-        if (!fileInput || !form || !grid) return;
+        // 요소가 하나라도 없으면 스킵 (다른 페이지이거나 권한 없음)
+        if (!fileInput || !form || !grid) {
+            // console.log(`Skipping setup for ${formId} (elements missing)`);
+            return;
+        }
 
         const submitButton = form.querySelector('button[type="submit"]');
         const progressBar = form.querySelector('.progress-bar');
         
+        // 셀렉트 박스들 캐싱
         const selects = grid.querySelectorAll('select');
         let currentPreviewData = {};
         let currentColumnLetters = [];
@@ -98,10 +107,13 @@ class StockApp {
             fileInput.value = '';
         };
 
+        // 파일 선택 이벤트 (핵심)
         fileInput.addEventListener('change', async (e) => {
+            console.log(`File changed: ${fileInputId}`);
             const file = e.target.files[0];
             if (!file) { resetUi(); return; }
 
+            // 로딩 표시
             if(wrapper) {
                 wrapper.classList.remove('bg-light', 'border-danger');
                 wrapper.classList.add('bg-warning-subtle');
@@ -126,9 +138,11 @@ class StockApp {
                     throw new Error(data.message || "분석 실패");
                 }
 
+                // 성공 처리
                 currentPreviewData = data.preview_data;
                 currentColumnLetters = data.column_letters;
                 
+                // 드롭다운 옵션 채우기
                 selects.forEach(select => {
                     const defaultText = select.querySelector('option:first-child')?.textContent || '-- 열 선택 --';
                     select.innerHTML = `<option value="">${defaultText}</option>`;
@@ -141,6 +155,7 @@ class StockApp {
                     select.disabled = false;
                 });
 
+                // UI 업데이트
                 if(wrapper) {
                     wrapper.classList.remove('bg-warning-subtle');
                     wrapper.classList.add('border-success', 'bg-success-subtle');
@@ -151,6 +166,7 @@ class StockApp {
                 if(submitButton) submitButton.style.display = 'block';
 
             } catch (error) {
+                console.error(error);
                 resetUi();
                 if(wrapper) {
                     wrapper.classList.remove('bg-warning-subtle');
@@ -161,13 +177,14 @@ class StockApp {
             }
         });
 
+        // 열 선택 시 미리보기
         grid.addEventListener('change', (e) => {
-            if (e.target.tagName !== 'SELECT') return;
+            if(e.target.tagName !== 'SELECT') return;
             const letter = e.target.value;
             const previewEl = e.target.closest('.mapping-item-wrapper')?.querySelector('.col-preview');
             
-            if (previewEl) {
-                if (letter && currentPreviewData[letter]) {
+            if(previewEl) {
+                if(letter && currentPreviewData[letter]) {
                     const items = currentPreviewData[letter].slice(0,3).map(v => `<div>${v||'(빈 값)'}</div>`).join('');
                     previewEl.innerHTML = `<div class="small text-muted mt-1">${items}</div>`;
                 } else {
@@ -176,6 +193,7 @@ class StockApp {
             }
         });
 
+        // 폼 제출
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if(!confirm('업로드를 진행하시겠습니까?')) return;
@@ -186,6 +204,7 @@ class StockApp {
                 submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 처리 중...';
             }
 
+            // (1) 검증 API
             try {
                 const verifyResp = await fetch('/api/verify_excel', {
                     method: 'POST',
@@ -196,6 +215,7 @@ class StockApp {
                 
                 if(vData.status !== 'success') throw new Error(vData.message);
 
+                // (2) 업로드 시작
                 if (vData.suspicious_rows && vData.suspicious_rows.length > 0) {
                     this.showVerificationModal(
                         vData.suspicious_rows, 
