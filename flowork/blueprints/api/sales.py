@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import request, jsonify, send_file
 from flask_login import login_required, current_user
 from sqlalchemy import func, or_
+from sqlalchemy.orm import selectinload
 import openpyxl
 
 from flowork.models import db, Sale, SaleItem, Setting, StoreStock, Variant, Product, Store, StockHistory
@@ -51,7 +52,6 @@ def create_sale():
     
     if not items: return jsonify({'status': 'error', 'message': '상품 없음'}), 400
     
-    # 서비스 호출로 위임
     result = SalesService.create_sale(
         store_id=current_user.store_id,
         user_id=current_user.id,
@@ -226,7 +226,10 @@ def get_sales_by_date():
 
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        sales = Sale.query.filter_by(
+        
+        sales = Sale.query.options(
+            selectinload(Sale.items)
+        ).filter_by(
             store_id=current_user.store_id, 
             sale_date=target_date
         ).order_by(Sale.daily_number.desc()).all()
@@ -363,7 +366,6 @@ def export_daily_sales():
 def refund_sale(sale_id):
     if not current_user.store_id: return jsonify({'status': 'error'}), 403
     
-    # 서비스 호출로 위임
     result = SalesService.refund_sale_full(sale_id, current_user.store_id, current_user.id)
     
     status_code = 200 if result['status'] == 'success' else 500
@@ -380,7 +382,6 @@ def refund_sale_partial(sale_id):
     if not refund_items:
         return jsonify({'status': 'error', 'message': '환불할 상품이 없습니다.'}), 400
 
-    # 서비스 호출로 위임
     result = SalesService.refund_sale_partial(sale_id, current_user.store_id, current_user.id, refund_items)
     
     status_code = 200 if result['status'] == 'success' else 500
