@@ -267,19 +267,4 @@ data-my-store-id="{{ my_store_id or 0 }}"
     window.allVariants = {{ variants_list_for_json | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/detail.js') }}" defer></script>
-<script>
-    function imgFallback(img) {
-        const src = img.src;
-        if (src.includes('_DF_01.jpg')) {
-            img.src = src.replace('_DF_01.jpg', '_DM_01.jpg');
-        } else if (src.includes('_DM_01.jpg')) {
-            img.src = src.replace('_DM_01.jpg', '_DG_01.jpg');
-        } else {
-            img.style.display = 'none';
-            if (img.nextElementSibling) {
-                img.nextElementSibling.style.display = 'block';
-            }
-        }
-    }
-</script>
 {% endblock %}

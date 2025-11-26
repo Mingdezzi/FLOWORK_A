@@ -17,6 +17,28 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <script>
+        window.imgFallback = function(img) {
+            const src = img.src;
+            if (src.includes('_DF_01.jpg')) {
+                img.src = src.replace('_DF_01.jpg', '_DM_01.jpg');
+            } else if (src.includes('_DM_01.jpg')) {
+                img.src = src.replace('_DM_01.jpg', '_DG_01.jpg');
+            } else {
+                // 최종적으로 이미지가 없으면 숨기거나 대체 이미지 표시
+                img.style.visibility = 'hidden';
+                img.style.width = '0px';
+                img.style.height = '0px';
+                // 만약 대체 텍스트나 아이콘을 보여주고 싶다면 아래 코드 활용
+                // if (img.parentElement) {
+                //    img.parentElement.classList.add('bg-light', 'text-center', 'd-flex', 'align-items-center', 'justify-content-center');
+                //    img.parentElement.innerHTML = '<i class="bi bi-image text-muted fs-4"></i>';
+                // }
+            }
+        };
+    </script>
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{{ 'iframe-mode' if request.args.get('iframe') == '1' else '' }}" {% block body_attrs %}{% endblock %}>
