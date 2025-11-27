@@ -1,4 +1,3 @@
-# fileName: mingdezzi/flowork/FLOWORK-c3d0a854c8688593f920b4aabbc4e40547365c57/flowork/blueprints/api/inventory.py
 import os
 import uuid
 import traceback
@@ -10,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from flowork.models import db, Product, Variant, StoreStock, Setting
 from flowork.utils import clean_string_upper, generate_barcode, get_sort_key
+from flowork.services.product_service import ProductService 
 
 from flowork.services.excel import (
     export_db_to_excel,
@@ -918,3 +918,73 @@ def reset_database_completely():
         flash(f"초기화 오류: {e}", "error")
 
     return redirect(url_for('ui.stock_management'))
+
+@api_bp.route('/api/products/advanced_search', methods=['POST'])
+@login_required
+def api_advanced_search():
+    """
+    [신규] 상품 상세 검색 API (Data-Centric)
+    HTML 대신 JSON 데이터를 반환합니다.
+    """
+    if current_user.is_super_admin:
+         return jsonify({'status': 'error', 'message': '슈퍼 관리자는 사용할 수 없습니다.'}), 403
+
+    try:
+        data = request.json
+        page = data.get('page', 1)
+        per_page = data.get('per_page', 20)
+        search_params = data.get('params', {})
+        
+        # 서비스 호출
+        result = ProductService.search_products(
+            current_user.current_brand_id, 
+            search_params, 
+            page=page, 
+            per_page=per_page
+        )
+        
+        # JSON 직렬화
+        products_json = []
+        
+        # 이미지 URL 헬퍼 (동적 계산)
+        from flowork.blueprints.ui.processors import get_image_url_helper 
+        
+        for p in result['items']:
+            # 색상/가격 정보 요약
+            colors = sorted(list(set(v.color for v in p.variants if v.color)))
+            first_var = p.variants[0] if p.variants else None
+            
+            sale_price = first_var.sale_price if first_var else 0
+            original_price = first_var.original_price if first_var else 0
+            discount_rate = 0
+            if original_price > 0 and original_price > sale_price:
+                discount_rate = int((1 - (sale_price / original_price)) * 100)
+
+            products_json.append({
+                'id': p.id,
+                'product_number': p.product_number,
+                'product_name': p.product_name,
+                'image_url': get_image_url_helper(p),
+                'colors': ", ".join(colors),
+                'sale_price': f"{sale_price:,}",
+                'original_price': original_price,
+                'is_discounted': (original_price > 0 and original_price > sale_price),
+                'discount_rate': discount_rate
+            })
+
+        return jsonify({
+            'status': 'success',
+            'data': products_json,
+            'pagination': {
+                'total': result['total'],
+                'pages': result['pages'],
+                'current_page': result['current_page'],
+                'has_next': result['has_next'],
+                'has_prev': result['has_prev']
+            }
+        })
+
+    except Exception as e:
+        print(f"Advanced search API error: {e}")
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500

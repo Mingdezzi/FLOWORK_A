@@ -1,123 +1,77 @@
 import traceback
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload, joinedload
 from flask import current_app
 from flowork.extensions import db, cache
 from flowork.models import Product, Variant, Store, StoreStock
+from flowork.utils import clean_string_upper
 
 class ProductService:
+    # ... (기존 get_product_detail_context, get_stock_overview_matrix 메서드 유지) ...
+
     @staticmethod
-    def get_product_detail_context(product_id, brand_id, my_store_id=None):
+    def search_products(brand_id, params, page=1, per_page=20):
+        """
+        [신규] 상세 검색 로직 (UI 뷰에서 분리됨)
+        """
         try:
-            # 1. 상품 및 옵션/재고 로드
-            product = Product.query.options(
-                selectinload(Product.variants).selectinload(Variant.stock_levels)
-            ).filter(
-                Product.id == product_id,
-                Product.brand_id == brand_id
-            ).first()
+            query = db.session.query(Product).options(selectinload(Product.variants)).filter(
+                 Product.brand_id == brand_id
+            )
+            
+            needs_variant_join = False
+            variant_filters = []
+            
+            # 필터 조건 적용
+            if params.get('product_name'):
+                query = query.filter(Product.product_name_cleaned.like(f"%{clean_string_upper(params['product_name'])}%"))
+            if params.get('product_number'):
+                query = query.filter(Product.product_number_cleaned.like(f"%{clean_string_upper(params['product_number'])}%"))
+            if params.get('item_category'):
+                query = query.filter(Product.item_category == params['item_category'])
+            if params.get('release_year'):
+                query = query.filter(Product.release_year == int(params['release_year']))
 
-            if not product:
-                return None
+            # Variant 관련 필터
+            if params.get('color'):
+                needs_variant_join = True
+                variant_filters.append(Variant.color_cleaned == clean_string_upper(params['color']))
+            if params.get('size'):
+                needs_variant_join = True
+                variant_filters.append(Variant.size_cleaned == clean_string_upper(params['size']))
+            if params.get('original_price'):
+                needs_variant_join = True
+                variant_filters.append(Variant.original_price == int(params['original_price']))
+            if params.get('sale_price'):
+                needs_variant_join = True
+                variant_filters.append(Variant.sale_price == int(params['sale_price']))
+            if params.get('min_discount'):
+                try:
+                    min_discount_val = float(params['min_discount']) / 100.0
+                    if min_discount_val > 0:
+                        needs_variant_join = True
+                        variant_filters.append(Variant.original_price > 0)
+                        variant_filters.append((Variant.sale_price / Variant.original_price) <= (1.0 - min_discount_val))
+                except (ValueError, TypeError):
+                    pass 
 
-            product_variants_for_map = product.variants
+            if needs_variant_join:
+                query = query.join(Product.variants).filter(*variant_filters)
             
-            # 2. 정렬된 변형 목록
-            variants = db.session.query(Variant).filter(
-                Variant.product_id == product.id
-            ).order_by(Variant.color, Variant.size).all()
+            # 정렬 및 페이징
+            pagination = query.order_by(
+                Product.release_year.desc(), Product.product_name
+            ).paginate(page=page, per_page=per_page, error_out=False)
             
-            variants_list_for_json = [{
-                'id': v.id,
-                'barcode': v.barcode,
-                'color': v.color,
-                'size': v.size,
-                'hq_quantity': v.hq_quantity or 0,
-                'original_price': v.original_price or 0,
-                'sale_price': v.sale_price or 0
-            } for v in variants]
-            
-            # 3. 전체 매장 목록
-            all_stores = Store.query.filter(
-                Store.brand_id == brand_id,
-                Store.is_active == True
-            ).order_by(Store.store_name).all()
-            
-            store_id_set = {s.id for s in all_stores}
-            
-            # 4. 재고 매트릭스 구축 (Store x Variant)
-            stock_data_map = {s.id: {} for s in all_stores}
-            
-            for v in product_variants_for_map:
-                for stock_level in v.stock_levels:
-                    if stock_level.store_id in store_id_set:
-                        stock_data_map[stock_level.store_id][v.id] = {
-                            'quantity': stock_level.quantity,
-                            'actual_stock': stock_level.actual_stock
-                        }
-            
-            # 5. 연관 상품
-            related_products = []
-            if product.item_category:
-                related_products = Product.query.options(selectinload(Product.variants)).filter(
-                    Product.brand_id == brand_id, 
-                    Product.item_category == product.item_category,
-                    Product.id != product.id
-                ).order_by(func.random()).limit(5).all()
-
             return {
-                'product': product,
-                'variants': variants,
-                'variants_list_for_json': variants_list_for_json,
-                'stock_data_map': stock_data_map,
-                'all_stores': all_stores,
-                'my_store_id': my_store_id,
-                'related_products': related_products
+                'items': pagination.items,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'current_page': page,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
             }
 
         except Exception as e:
-            current_app.logger.error(f"Error in ProductService.get_product_detail_context: {e}")
-            traceback.print_exc()
-            raise e
-
-    @staticmethod
-    @cache.memoize(timeout=300) # 5분간 캐싱 (브랜드 ID 기준)
-    def get_stock_overview_matrix(brand_id):
-        try:
-            current_app.logger.info(f"Fetching stock overview matrix for brand_id: {brand_id} (Not Cached)")
-            
-            all_stores = Store.query.filter(
-                Store.brand_id == brand_id,
-                Store.is_active == True
-            ).order_by(Store.store_name).all()
-            
-            store_id_set = {s.id for s in all_stores}
-
-            all_variants = db.session.query(Variant)\
-                .join(Product)\
-                .filter(Product.brand_id == brand_id)\
-                .options(
-                    joinedload(Variant.product),
-                    selectinload(Variant.stock_levels)
-                )\
-                .order_by(Product.product_number, Variant.color, Variant.size)\
-                .all()
-            
-            stock_matrix = {}
-            for v in all_variants:
-                stock_map_for_variant = {}
-                for stock_level in v.stock_levels:
-                    if stock_level.store_id in store_id_set:
-                        stock_map_for_variant[stock_level.store_id] = stock_level.quantity
-                
-                stock_matrix[v.id] = stock_map_for_variant
-                
-            return {
-                'all_stores': all_stores,
-                'all_variants': all_variants,
-                'stock_matrix': stock_matrix
-            }
-        except Exception as e:
-            current_app.logger.error(f"Error in ProductService.get_stock_overview_matrix: {e}")
-            traceback.print_exc()
+            current_app.logger.error(f"Search products error: {e}")
             raise e

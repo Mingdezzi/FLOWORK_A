@@ -46,5 +46,9 @@
       "https://img.k-village.co.kr/product/{year}/{code}/{code}_DG_{num}.jpg",
       "https://img.k-village.co.kr/product/{year}/{code}/{code}_DG_{num}.JPG"
     ]
-  }
+  },
+  "IMAGE_FALLBACK_RULES": [
+    { "from": "_DF_01.jpg", "to": "_DM_01.jpg" },
+    { "from": "_DM_01.jpg", "to": "_DG_01.jpg" }
+  ]
 }
