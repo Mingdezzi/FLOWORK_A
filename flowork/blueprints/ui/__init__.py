@@ -2,11 +2,12 @@ from flask import Blueprint, request
 
 ui_bp = Blueprint('ui', __name__, template_folder='../../templates')
 
-# [수정] Context Processor 도입: 모든 템플릿 렌더링 시 자동으로 호출됨
-@ui_bp.context_processor
+# [수정] context_processor -> app_context_processor 변경
+# 이렇게 해야 404 에러 등 블루프린트 밖의 요청에서도 변수가 주입됩니다.
+@ui_bp.app_context_processor
 def inject_spa_context():
     """
-    모든 UI 템플릿 렌더링 시 호출되어,
+    모든 템플릿 렌더링 시 호출되어,
     AJAX 요청 여부에 따라 상속받을 부모 템플릿(extends_template)을 결정해 주입합니다.
     """
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
