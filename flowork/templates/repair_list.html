@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends extends_template %}
 
 {% block body_attrs %}
 data-api-status-url="{{ url_for('api.update_repair_status', repair_id=0)[:-1] }}"

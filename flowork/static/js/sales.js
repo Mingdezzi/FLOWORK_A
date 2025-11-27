@@ -1,90 +1,117 @@
 /**
- * Sales POS Application Logic
- * Refactored to use Class-based structure and Common Utilities
+ * Sales POS Application Logic (Refactored for Tab System)
  */
 
 class SalesApp {
     constructor() {
-        this.urls = JSON.parse(document.body.dataset.apiUrls);
-        this.mode = 'sales'; // 'sales' or 'refund'
+        this.urls = null;
+        this.mode = 'sales';
         this.cart = [];
         this.heldCart = null;
         this.isOnline = false;
         this.refundSaleId = null;
         this.config = { amount_discounts: [] };
+        this.container = null;
+        this.dom = {};
         
-        this.dom = this.cacheDom();
-        this.init();
-    }
-
-    cacheDom() {
-        return {
-            leftPanel: document.getElementById('sales-left-panel'),
-            dateSales: document.getElementById('date-area-sales'),
-            dateRefund: document.getElementById('date-area-refund'),
-            saleDate: document.getElementById('sale-date'),
-            refundStart: document.getElementById('refund-start'),
-            refundEnd: document.getElementById('refund-end'),
-            modeSales: document.getElementById('mode-sales'),
-            modeRefund: document.getElementById('mode-refund'),
-            searchInput: document.getElementById('search-input'),
-            btnSearch: document.getElementById('btn-search'),
-            leftThead: document.getElementById('left-table-head'),
-            leftTbody: document.getElementById('left-table-body'),
-            cartTbody: document.getElementById('cart-tbody'),
-            totalQty: document.getElementById('total-qty'),
-            totalAmt: document.getElementById('total-amount'),
-            salesActions: document.getElementById('sales-actions'),
-            refundActions: document.getElementById('refund-actions'),
-            refundInfo: document.getElementById('refund-target-info'),
-            btnSubmitSale: document.getElementById('btn-submit-sale'),
-            btnSubmitRefund: document.getElementById('btn-submit-refund'),
-            btnCancelRefund: document.getElementById('btn-cancel-refund'),
-            btnToggleOnline: document.getElementById('btn-toggle-online'),
-            btnClearCart: document.getElementById('btn-clear-cart'),
-            btnHold: document.getElementById('btn-hold-sale'),
-            btnDiscount: document.getElementById('btn-apply-discount'),
-            detailModal: new bootstrap.Modal(document.getElementById('detail-modal')),
-            recordsModal: new bootstrap.Modal(document.getElementById('records-modal'))
+        this.handlers = {
+            search: () => this.search(),
+            searchKey: (e) => { if(e.key==='Enter') this.search(); },
+            toggleOnline: () => this.toggleOnline(),
+            clearCart: () => { this.cart = []; this.renderCart(); },
+            submitSale: () => this.submitSale(),
+            submitRefund: () => this.submitRefund(),
+            resetRefund: () => this.resetRefund(),
+            toggleHold: () => this.toggleHold(),
+            applyDiscount: () => this.applyAutoDiscount(),
+            setModeSales: () => this.setMode('sales'),
+            setModeRefund: () => this.setMode('refund'),
+            focusSearch: () => { if(this.dom.searchInput) this.dom.searchInput.focus(); }
         };
     }
 
-    init() {
-        // 날짜 초기화
+    init(container) {
+        this.container = container;
+        
+        // [수정] 데이터셋 병합 (전역 설정 + 탭별 설정)
+        const dataset = Object.assign({}, document.body.dataset, container.dataset);
+        this.urls = dataset.apiUrls ? JSON.parse(dataset.apiUrls) : {};
+        
+        this.dom = {
+            leftPanel: container.querySelector('#sales-left-panel'),
+            dateSales: container.querySelector('#date-area-sales'),
+            dateRefund: container.querySelector('#date-area-refund'),
+            saleDate: container.querySelector('#sale-date'),
+            refundStart: container.querySelector('#refund-start'),
+            refundEnd: container.querySelector('#refund-end'),
+            modeSales: container.querySelector('#mode-sales'),
+            modeRefund: container.querySelector('#mode-refund'),
+            searchInput: container.querySelector('#search-input'),
+            btnSearch: container.querySelector('#btn-search'),
+            leftThead: container.querySelector('#left-table-head'),
+            leftTbody: container.querySelector('#left-table-body'),
+            cartTbody: container.querySelector('#cart-tbody'),
+            totalQty: container.querySelector('#total-qty'),
+            totalAmt: container.querySelector('#total-amount'),
+            salesActions: container.querySelector('#sales-actions'),
+            refundActions: container.querySelector('#refund-actions'),
+            refundInfo: container.querySelector('#refund-target-info'),
+            btnSubmitSale: container.querySelector('#btn-submit-sale'),
+            btnSubmitRefund: container.querySelector('#btn-submit-refund'),
+            btnCancelRefund: container.querySelector('#btn-cancel-refund'),
+            btnToggleOnline: container.querySelector('#btn-toggle-online'),
+            btnClearCart: container.querySelector('#btn-clear-cart'),
+            btnHold: container.querySelector('#btn-hold-sale'),
+            btnDiscount: container.querySelector('#btn-apply-discount'),
+            rightPanelTitle: container.querySelector('#right-panel-title'),
+            detailModalEl: container.querySelector('#detail-modal'),
+            recordsModalEl: container.querySelector('#records-modal')
+        };
+
+        if (this.dom.detailModalEl) this.detailModal = new bootstrap.Modal(this.dom.detailModalEl);
+        if (this.dom.recordsModalEl) this.recordsModal = new bootstrap.Modal(this.dom.recordsModalEl);
+
+        this.initData();
+        this.bindEvents();
+    }
+
+    destroy() {
+        if(this.dom.btnSearch) this.dom.btnSearch.removeEventListener('click', this.handlers.search);
+        if(this.dom.searchInput) this.dom.searchInput.removeEventListener('keydown', this.handlers.searchKey);
+        
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(bd => bd.remove());
+        
+        this.container = null;
+    }
+
+    initData() {
         const today = new Date();
         const lastMonth = new Date();
         lastMonth.setMonth(today.getMonth() - 1);
         
-        this.dom.saleDate.value = Flowork.fmtDate(today);
-        this.dom.refundEnd.value = Flowork.fmtDate(today);
-        this.dom.refundStart.value = Flowork.fmtDate(lastMonth);
+        if(this.dom.saleDate) this.dom.saleDate.value = Flowork.fmtDate(today);
+        if(this.dom.refundEnd) this.dom.refundEnd.value = Flowork.fmtDate(today);
+        if(this.dom.refundStart) this.dom.refundStart.value = Flowork.fmtDate(lastMonth);
 
-        // 설정 로드
         this.loadSettings();
+    }
 
-        // 이벤트 바인딩
-        this.dom.modeSales.addEventListener('change', () => this.setMode('sales'));
-        this.dom.modeRefund.addEventListener('change', () => this.setMode('refund'));
-        
-        this.dom.searchInput.addEventListener('keydown', (e) => { if(e.key==='Enter') this.search(); });
-        this.dom.btnSearch.addEventListener('click', () => this.search());
-        
-        this.dom.btnToggleOnline.addEventListener('click', () => this.toggleOnline());
-        this.dom.btnClearCart.addEventListener('click', () => { this.cart = []; this.renderCart(); });
-        
-        this.dom.btnSubmitSale.addEventListener('click', () => this.submitSale());
-        this.dom.btnSubmitRefund.addEventListener('click', () => this.submitRefund());
-        this.dom.btnCancelRefund.addEventListener('click', () => this.resetRefund());
-        
-        this.dom.btnHold.addEventListener('click', () => this.toggleHold());
-        this.dom.btnDiscount.addEventListener('click', () => this.applyAutoDiscount());
+    bindEvents() {
+        if(this.dom.modeSales) this.dom.modeSales.addEventListener('change', this.handlers.setModeSales);
+        if(this.dom.modeRefund) this.dom.modeRefund.addEventListener('change', this.handlers.setModeRefund);
+        if(this.dom.searchInput) this.dom.searchInput.addEventListener('keydown', this.handlers.searchKey);
+        if(this.dom.btnSearch) this.dom.btnSearch.addEventListener('click', this.handlers.search);
+        if(this.dom.btnToggleOnline) this.dom.btnToggleOnline.addEventListener('click', this.handlers.toggleOnline);
+        if(this.dom.btnClearCart) this.dom.btnClearCart.addEventListener('click', this.handlers.clearCart);
+        if(this.dom.btnSubmitSale) this.dom.btnSubmitSale.addEventListener('click', this.handlers.submitSale);
+        if(this.dom.btnSubmitRefund) this.dom.btnSubmitRefund.addEventListener('click', this.handlers.submitRefund);
+        if(this.dom.btnCancelRefund) this.dom.btnCancelRefund.addEventListener('click', this.handlers.resetRefund);
+        if(this.dom.btnHold) this.dom.btnHold.addEventListener('click', this.handlers.toggleHold);
+        if(this.dom.btnDiscount) this.dom.btnDiscount.addEventListener('click', this.handlers.applyDiscount);
 
-        // 모달 닫힘 이벤트 (포커스 복귀)
-        ['detail-modal', 'records-modal'].forEach(id => {
-            document.getElementById(id).addEventListener('hidden.bs.modal', () => {
-                this.dom.searchInput.focus();
-            });
-        });
+        if(this.dom.detailModalEl) this.dom.detailModalEl.addEventListener('hidden.bs.modal', this.handlers.focusSearch);
+        if(this.dom.recordsModalEl) this.dom.recordsModalEl.addEventListener('hidden.bs.modal', this.handlers.focusSearch);
     }
 
     async loadSettings() {
@@ -111,7 +138,7 @@ class SalesApp {
         this.dom.refundActions.style.display = isSales ? 'none' : 'flex';
         
         const titleHtml = isSales ? '<i class="bi bi-cart4"></i> 판매 목록' : '<i class="bi bi-arrow-return-left"></i> 환불 목록';
-        document.getElementById('right-panel-title').innerHTML = titleHtml;
+        this.dom.rightPanelTitle.innerHTML = titleHtml;
     }
 
     toggleOnline() {
@@ -177,11 +204,11 @@ class SalesApp {
     }
 
     async showDetailModal(item) {
-        const title = document.getElementById('detail-modal-title');
-        const tbody = document.getElementById('detail-modal-tbody');
+        const title = this.dom.detailModalEl.querySelector('#detail-modal-title');
+        const tbody = this.dom.detailModalEl.querySelector('#detail-modal-tbody');
         title.textContent = `${item.product_name} (${item.product_number})`;
         tbody.innerHTML = '<tr><td colspan="6">로딩중...</td></tr>';
-        this.dom.detailModal.show();
+        this.detailModal.show();
 
         try {
             const data = await Flowork.post(this.urls.searchSalesProducts, { 
@@ -202,7 +229,7 @@ class SalesApp {
                 `;
                 const addHandler = () => {
                     this.addToCart({ ...item, ...v, quantity: 1 });
-                    this.dom.detailModal.hide();
+                    this.detailModal.hide();
                 };
                 tr.querySelector('.btn-add').onclick = addHandler;
                 tr.ondblclick = addHandler;
@@ -212,11 +239,11 @@ class SalesApp {
     }
 
     async showRefundRecords(item) {
-        const title = document.getElementById('records-modal-title');
-        const tbody = document.getElementById('records-modal-tbody');
+        const title = this.dom.recordsModalEl.querySelector('#records-modal-title');
+        const tbody = this.dom.recordsModalEl.querySelector('#records-modal-tbody');
         title.textContent = `판매 기록: ${item.product_number} (${item.color})`;
         tbody.innerHTML = '<tr><td colspan="8">조회중...</td></tr>';
-        this.dom.recordsModal.show();
+        this.recordsModal.show();
 
         try {
             const data = await Flowork.post(this.urls.getRefundRecords, {
@@ -247,7 +274,7 @@ class SalesApp {
                 `;
                 tr.onclick = async () => {
                     await this.loadRefundCart(rec.sale_id, rec.receipt_number);
-                    this.dom.recordsModal.hide();
+                    this.recordsModal.hide();
                 };
                 tbody.appendChild(tr);
             });
@@ -335,7 +362,6 @@ class SalesApp {
         this.dom.totalQty.textContent = Flowork.fmtNum(totalQty);
         this.dom.totalAmt.textContent = Flowork.fmtNum(totalAmt);
 
-        // 이벤트 위임 대신 직접 바인딩 (행 개수가 적으므로)
         tbody.querySelectorAll('.qty-in').forEach(el => {
             el.onchange = (e) => {
                 const v = parseInt(e.target.value);
@@ -445,6 +471,5 @@ class SalesApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    new SalesApp();
-});
+window.PageRegistry = window.PageRegistry || {};
+window.PageRegistry['sales'] = new SalesApp();

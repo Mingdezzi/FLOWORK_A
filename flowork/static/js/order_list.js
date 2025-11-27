@@ -1,17 +1,31 @@
-document.addEventListener('DOMContentLoaded', () => {
-    
-    // [수정] CSRF 토큰 가져오기
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    
-    // (신규) API URL 가져오기
-    const updateStatusUrl = document.body.dataset.updateStatusUrl;
+class OrderListApp {
+    constructor() {
+        this.container = null;
+        this.csrfToken = null;
+        this.updateStatusUrl = null;
+        this.handlers = {};
+    }
 
-    // (신규) 이벤트 위임을 사용하여 두 목록(진행 중, 월별)의 버튼 클릭을 모두 처리
-    document.body.addEventListener('click', async (e) => {
-        // 클릭된 요소가 .status-btn 인지 확인
+    init(container) {
+        this.container = container;
+        this.csrfToken = Flowork.getCsrfToken();
+        this.updateStatusUrl = document.body.dataset.updateStatusUrl || '/api/update_order_status';
+
+        this.handlers.statusClick = (e) => this.handleStatusClick(e);
+        this.container.addEventListener('click', this.handlers.statusClick);
+    }
+
+    destroy() {
+        if (this.container) {
+            this.container.removeEventListener('click', this.handlers.statusClick);
+        }
+        this.container = null;
+        this.handlers = {};
+    }
+
+    async handleStatusClick(e) {
         const targetButton = e.target.closest('.status-btn');
         
-        // .status-btn이 아니거나, 이미 active 상태이면 아무것도 안 함
         if (!targetButton || targetButton.classList.contains('active')) {
             return;
         }
@@ -19,19 +33,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const orderId = targetButton.dataset.orderId;
         const newStatus = targetButton.dataset.newStatus;
         
-        if (!orderId || !newStatus || !updateStatusUrl) {
-            return;
-        }
+        if (!orderId || !newStatus) return;
 
-        // (신규) 사용자 확인
         if (confirm(`주문(ID: ${orderId})의 상태를 [${newStatus}](으)로 변경하시겠습니까?`)) {
             try {
-                // (신규) API 서버로 Fetch 요청
-                const response = await fetch(updateStatusUrl, {
+                const response = await fetch(this.updateStatusUrl, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken // [수정] 헤더 추가
+                        'X-CSRFToken': this.csrfToken
                     },
                     body: JSON.stringify({
                         order_id: orderId,
@@ -42,9 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
 
                 if (response.ok && data.status === 'success') {
-                    // (신규) 성공 시, 페이지를 새로고침하여 변경사항(목록 이동 등)을 반영
                     alert('상태가 변경되었습니다.');
-                    window.location.reload(); 
+                    if (TabManager && TabManager.activeTabId) {
+                        const tab = TabManager.tabs.find(t => t.id === TabManager.activeTabId);
+                        if (tab) TabManager.loadContent(tab.id, tab.url);
+                    } else {
+                        window.location.reload();
+                    }
                 } else {
                     throw new Error(data.message || '상태 변경에 실패했습니다.');
                 }
@@ -53,5 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`오류: ${error.message}`);
             }
         }
-    });
-});
+    }
+}
+
+window.PageRegistry = window.PageRegistry || {};
+window.PageRegistry['order_list'] = new OrderListApp();

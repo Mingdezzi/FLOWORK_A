@@ -1,326 +1,267 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const barcodeInput = document.getElementById('barcode-input');
-    const toggleBtn = document.getElementById('toggle-scan-btn');
-    const scanTableBody = document.getElementById('scan-table-body');
-    const scanStatusAlert = document.getElementById('scan-status-alert');
-    const scanStatusMessage = document.getElementById('scan-status-message');
-    const scanTotalStatus = document.getElementById('scan-total-status');
-    
-    const clearBtn = document.getElementById('clear-scan-btn');
-    const submitBtn = document.getElementById('submit-scan-btn');
+class CheckApp {
+    constructor() {
+        this.container = null;
+        this.isScanning = false;
+        this.scanList = {}; // 탭별 독립된 스캔 목록
+        this.targetStoreId = null;
+        this.alertTimeout = null;
+        this.handlers = {};
+    }
 
-    const fetchUrl = document.body.dataset.apiFetchVariantUrl;
-    const updateUrl = document.body.dataset.bulkUpdateActualStockUrl;
+    init(container) {
+        this.container = container;
+        
+        // DOM 캐싱 (Scoped)
+        this.dom = {
+            barcodeInput: container.querySelector('#barcode-input'),
+            toggleBtn: container.querySelector('#toggle-scan-btn'),
+            scanTableBody: container.querySelector('#scan-table-body'),
+            scanStatusAlert: container.querySelector('#scan-status-alert'),
+            scanStatusMessage: container.querySelector('#scan-status-message'),
+            scanTotalStatus: container.querySelector('#scan-total-status'),
+            clearBtn: container.querySelector('#clear-scan-btn'),
+            submitBtn: container.querySelector('#submit-scan-btn'),
+            targetStoreSelect: container.querySelector('#target_store_select'),
+            exportBtn: container.querySelector('#btn-export-excel'),
+            resetHiddenInput: container.querySelector('#reset_target_store_id'),
+            resetForm: container.querySelector('#form-reset-stock')
+        };
 
-    // [수정] 브랜드 관리자용 매장 선택 요소 가져오기
-    const targetStoreSelect = document.getElementById('target_store_select');
-    const exportBtn = document.getElementById('btn-export-excel');
-    const resetHiddenInput = document.getElementById('reset_target_store_id');
-    const resetForm = document.getElementById('form-reset-stock');
+        this.urls = {
+            fetchVariant: document.body.dataset.apiFetchVariantUrl || '/api/fetch_variant',
+            updateActual: document.body.dataset.bulkUpdateActualStockUrl || '/bulk_update_actual_stock'
+        };
 
-    let isScanning = false;
-    let scanList = {}; // { barcode_cleaned: { variant_id, product_name, ... , quantity } }
-    let targetStoreId = null; // 선택된 매장 ID
+        // 초기 상태 설정
+        if(this.dom.scanStatusAlert) this.dom.scanStatusAlert.style.display = 'none';
+        
+        // 매장 선택 로직 초기화
+        if (this.dom.targetStoreSelect) {
+            this.targetStoreId = this.dom.targetStoreSelect.value;
+            this.updateUiForStore(this.targetStoreId);
+        } else {
+            this.targetStoreId = null; // 매장 관리자는 서버 세션 store_id 사용
+        }
 
-    // [신규] 초기 매장 ID 설정 및 이벤트 리스너
-    if (targetStoreSelect) {
-        // 브랜드 관리자일 경우
-        targetStoreSelect.addEventListener('change', () => {
-            targetStoreId = targetStoreSelect.value;
-            updateUiForStore(targetStoreId);
-            
-            // 매장이 변경되면 기존 스캔 목록 초기화 (데이터 혼동 방지)
-            if (Object.keys(scanList).length > 0) {
-                if (confirm('매장이 변경되어 현재 스캔 목록을 초기화합니다.')) {
-                    clearScanList();
-                } else {
-                    // 취소 시 이전 값으로 되돌리기 (복잡하면 생략 가능, 여기선 값만 유지)
+        this.bindEvents();
+    }
+
+    destroy() {
+        if(this.dom.toggleBtn) this.dom.toggleBtn.removeEventListener('click', this.handlers.toggleScan);
+        if(this.dom.barcodeInput) this.dom.barcodeInput.removeEventListener('keydown', this.handlers.barcodeKey);
+        if(this.dom.clearBtn) this.dom.clearBtn.removeEventListener('click', this.handlers.clearList);
+        if(this.dom.submitBtn) this.dom.submitBtn.removeEventListener('click', this.handlers.submit);
+        if(this.dom.targetStoreSelect) this.dom.targetStoreSelect.removeEventListener('change', this.handlers.storeChange);
+        if(this.dom.resetForm) this.dom.resetForm.removeEventListener('submit', this.handlers.resetSubmit);
+        if(this.dom.scanTableBody) this.dom.scanTableBody.removeEventListener('change', this.handlers.qtyChange);
+
+        clearTimeout(this.alertTimeout);
+        this.container = null;
+        this.dom = {};
+        this.scanList = {};
+    }
+
+    bindEvents() {
+        this.handlers = {
+            toggleScan: () => this.toggleScanner(),
+            barcodeKey: (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const code = this.dom.barcodeInput.value.trim();
+                    if(code) this.processBarcode(code);
+                    this.dom.barcodeInput.value = '';
+                }
+            },
+            clearList: () => {
+                if (confirm('스캔 목록을 초기화하시겠습니까?')) this.clearScanList();
+            },
+            submit: () => this.submitScan(),
+            storeChange: () => {
+                this.targetStoreId = this.dom.targetStoreSelect.value;
+                this.updateUiForStore(this.targetStoreId);
+                if (Object.keys(this.scanList).length > 0) {
+                    if (confirm('매장이 변경되어 현재 스캔 목록을 초기화합니다.')) this.clearScanList();
+                }
+            },
+            resetSubmit: (e) => {
+                if (this.dom.targetStoreSelect && !this.dom.resetHiddenInput.value) {
+                    e.preventDefault();
+                    alert('초기화할 매장을 선택해주세요.');
+                }
+            },
+            qtyChange: (e) => {
+                if(e.target.classList.contains('qty-input')) {
+                    const bc = e.target.dataset.barcode;
+                    const newQty = parseInt(e.target.value);
+                    if(this.scanList[bc] && newQty >= 0) {
+                        this.scanList[bc].scan_quantity = newQty;
+                        this.renderTable();
+                    }
                 }
             }
-        });
-        // 초기값 설정
-        targetStoreId = targetStoreSelect.value;
-        updateUiForStore(targetStoreId);
-    } else {
-        // 매장 관리자일 경우 (targetStoreId는 null -> 서버에서 current_user.store_id 사용)
-        targetStoreId = null;
+        };
+
+        if(this.dom.toggleBtn) this.dom.toggleBtn.addEventListener('click', this.handlers.toggleScan);
+        if(this.dom.barcodeInput) this.dom.barcodeInput.addEventListener('keydown', this.handlers.barcodeKey);
+        if(this.dom.clearBtn) this.dom.clearBtn.addEventListener('click', this.handlers.clearList);
+        if(this.dom.submitBtn) this.dom.submitBtn.addEventListener('click', this.handlers.submit);
+        if(this.dom.targetStoreSelect) this.dom.targetStoreSelect.addEventListener('change', this.handlers.storeChange);
+        if(this.dom.resetForm) this.dom.resetForm.addEventListener('submit', this.handlers.resetSubmit);
+        // 이벤트 위임 for qty inputs
+        if(this.dom.scanTableBody) this.dom.scanTableBody.addEventListener('change', this.handlers.qtyChange);
     }
 
-    // [신규] 매장 변경 시 UI(엑셀 링크, 초기화 폼) 업데이트 함수
-    function updateUiForStore(storeId) {
-        // 엑셀 다운로드 링크 수정
-        if (exportBtn) {
-            const originalHref = exportBtn.getAttribute('href').split('?')[0];
-            if (storeId) {
-                exportBtn.setAttribute('href', `${originalHref}?target_store_id=${storeId}`);
-            } else {
-                exportBtn.setAttribute('href', originalHref); // 혹은 href="#" 처리
-            }
+    updateUiForStore(storeId) {
+        if (this.dom.exportBtn) {
+            const originalHref = this.dom.exportBtn.getAttribute('href').split('?')[0];
+            this.dom.exportBtn.setAttribute('href', storeId ? `${originalHref}?target_store_id=${storeId}` : originalHref);
         }
-        
-        // 초기화 폼 히든 값 수정
-        if (resetHiddenInput) {
-            resetHiddenInput.value = storeId || '';
+        if (this.dom.resetHiddenInput) {
+            this.dom.resetHiddenInput.value = storeId || '';
         }
     }
 
-    // 초기 상태: 알림 숨김
-    scanStatusAlert.style.display = 'none';
-
-    // 리딩 ON/OFF 토글
-    toggleBtn.addEventListener('click', () => {
-        // 브랜드 관리자가 매장을 선택하지 않고 리딩을 켜려 할 때 경고
-        if (targetStoreSelect && !targetStoreId) {
+    toggleScanner() {
+        if (this.dom.targetStoreSelect && !this.targetStoreId) {
             alert('작업할 매장을 먼저 선택해주세요.');
-            targetStoreSelect.focus();
+            this.dom.targetStoreSelect.focus();
             return;
         }
 
-        isScanning = !isScanning;
-        if (isScanning) {
-            toggleBtn.classList.replace('btn-success', 'btn-danger');
-            toggleBtn.innerHTML = '<i class="bi bi-power me-1"></i> 리딩 OFF';
-            barcodeInput.disabled = false;
-            barcodeInput.placeholder = "바코드를 스캔하세요...";
-            barcodeInput.focus();
+        this.isScanning = !this.isScanning;
+        const btn = this.dom.toggleBtn;
+        const input = this.dom.barcodeInput;
+
+        if (this.isScanning) {
+            btn.classList.replace('btn-success', 'btn-danger');
+            btn.innerHTML = '<i class="bi bi-power me-1"></i> 리딩 OFF';
+            input.disabled = false;
+            input.placeholder = "바코드를 스캔하세요...";
+            input.focus();
         } else {
-            toggleBtn.classList.replace('btn-danger', 'btn-success');
-            toggleBtn.innerHTML = '<i class="bi bi-power me-1"></i> 리딩 ON';
-            barcodeInput.disabled = true;
-            barcodeInput.placeholder = "리딩 OFF 상태...";
-            barcodeInput.value = '';
+            btn.classList.replace('btn-danger', 'btn-success');
+            btn.innerHTML = '<i class="bi bi-power me-1"></i> 리딩 ON';
+            input.disabled = true;
+            input.placeholder = "리딩 OFF 상태...";
+            input.value = '';
         }
-    });
+    }
 
-    // 바코드 입력 처리 (Enter 키)
-    barcodeInput.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const barcode = barcodeInput.value.trim();
-            if (barcode) {
-                await processBarcode(barcode);
-            }
-            barcodeInput.value = ''; 
-        }
-    });
-
-    // 바코드 처리 함수
-    async function processBarcode(barcode) {
+    async processBarcode(barcode) {
         try {
-            // 1. 서버에 바코드 정보 및 재고 조회
-            // [수정] target_store_id를 함께 전송
-            const response = await fetch(fetchUrl, {
+            const response = await fetch(this.urls.fetchVariant, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
+                    'X-CSRFToken': Flowork.getCsrfToken()
                 },
                 body: JSON.stringify({ 
                     barcode: barcode,
-                    target_store_id: targetStoreId 
+                    target_store_id: this.targetStoreId 
                 })
             });
 
             const data = await response.json();
 
             if (response.ok && data.status === 'success') {
-                // 2. 스캔 목록에 추가/업데이트
-                addToList(data);
-                showStatus(`스캔 성공: ${data.product_name} (${data.color}/${data.size})`, 'success');
+                this.addToList(data);
+                this.showStatus(`스캔 성공: ${data.product_name} (${data.color}/${data.size})`, 'success');
             } else {
-                showStatus(`오류: ${data.message}`, 'danger');
-                playErrorSound(); 
+                this.showStatus(`오류: ${data.message}`, 'danger');
             }
-
         } catch (error) {
             console.error('Error:', error);
-            showStatus('서버 통신 오류 발생', 'danger');
-            playErrorSound();
+            this.showStatus('서버 통신 오류 발생', 'danger');
         }
     }
 
-    function addToList(data) {
-        // clean_barcode 등을 키로 사용 (서버가 주는 유니크 키가 좋음, 여기선 barcode 사용)
-        const key = data.barcode; 
-
-        if (scanList[key]) {
-            scanList[key].scan_quantity += 1;
+    addToList(data) {
+        const key = data.barcode;
+        if (this.scanList[key]) {
+            this.scanList[key].scan_quantity += 1;
         } else {
-            scanList[key] = {
-                ...data,
-                scan_quantity: 1
-            };
+            this.scanList[key] = { ...data, scan_quantity: 1 };
         }
-        renderTable();
+        this.renderTable();
     }
 
-    function renderTable() {
-        scanTableBody.innerHTML = '';
+    renderTable() {
+        this.dom.scanTableBody.innerHTML = '';
         let totalItems = 0;
         let totalQty = 0;
-
-        // 최신 스캔이 위로 오게 하려면 배열로 변환 후 역순 정렬 or prepend 사용
-        // 여기서는 단순 순회
-        const items = Object.values(scanList).reverse(); 
+        const items = Object.values(this.scanList).reverse();
 
         items.forEach(item => {
-            const tr = document.createElement('tr');
-            
             const diff = item.scan_quantity - item.store_stock;
-            let diffClass = '';
-            let diffText = diff;
-            if (diff > 0) {
-                diffClass = 'text-primary fw-bold';
-                diffText = `+${diff}`;
-            } else if (diff < 0) {
-                diffClass = 'text-danger fw-bold';
-            } else {
-                diffClass = 'text-success';
-                diffText = '0 (일치)';
-            }
+            let diffClass = diff > 0 ? 'text-primary fw-bold' : (diff < 0 ? 'text-danger fw-bold' : 'text-success');
+            let diffText = diff > 0 ? `+${diff}` : (diff === 0 ? '0 (일치)' : diff);
 
+            const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>
-                    <div class="fw-bold">${item.product_name}</div>
-                    <div class="small text-muted">${item.product_number}</div>
-                </td>
+                <td><div class="fw-bold">${item.product_name}</div><div class="small text-muted">${item.product_number}</div></td>
                 <td>${item.color}</td>
                 <td>${item.size}</td>
                 <td>${item.store_stock}</td>
-                <td>
-                    <input type="number" class="form-control form-control-sm qty-input" 
-                           style="width: 70px;" 
-                           data-barcode="${item.barcode}" 
-                           value="${item.scan_quantity}" min="0">
-                </td>
+                <td><input type="number" class="form-control form-control-sm qty-input" style="width: 70px;" data-barcode="${item.barcode}" value="${item.scan_quantity}" min="0"></td>
                 <td class="${diffClass}">${diffText}</td>
             `;
-            scanTableBody.appendChild(tr);
-
-            totalItems += 1;
+            this.dom.scanTableBody.appendChild(tr);
+            totalItems++;
             totalQty += item.scan_quantity;
         });
 
-        scanTotalStatus.innerHTML = `총 <strong>${totalItems}</strong> 개 품목 (<strong>${totalQty}</strong>개)`;
-        
-        // 수량 수동 변경 이벤트 리스너
-        document.querySelectorAll('.qty-input').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const bc = e.target.dataset.barcode;
-                const newQty = parseInt(e.target.value);
-                if (scanList[bc] && newQty >= 0) {
-                    scanList[bc].scan_quantity = newQty;
-                    renderTable(); // 다시 렌더링해서 과부족 업데이트
-                }
-            });
-        });
+        if(this.dom.scanTotalStatus) {
+            this.dom.scanTotalStatus.innerHTML = `총 <strong>${totalItems}</strong> 개 품목 (<strong>${totalQty}</strong>개)`;
+        }
     }
 
-    // 목록 초기화
-    clearBtn.addEventListener('click', () => {
-        if (confirm('스캔 목록을 초기화하시겠습니까?')) {
-            clearScanList();
-        }
-    });
-
-    function clearScanList() {
-        scanList = {};
-        renderTable();
-        showStatus('목록이 초기화되었습니다.', 'info');
-        barcodeInput.focus();
+    clearScanList() {
+        this.scanList = {};
+        this.renderTable();
+        this.showStatus('목록이 초기화되었습니다.', 'info');
+        if(this.dom.barcodeInput) this.dom.barcodeInput.focus();
     }
 
-    // 최종 저장
-    submitBtn.addEventListener('click', async () => {
-        const items = Object.values(scanList);
-        if (items.length === 0) {
-            alert('저장할 스캔 내역이 없습니다.');
-            return;
-        }
-
-        // 브랜드 관리자가 매장 선택 안했으면 차단
-        if (targetStoreSelect && !targetStoreId) {
-            alert('작업할 매장이 선택되지 않았습니다.');
-            return;
-        }
-
-        if (!confirm(`총 ${items.length}개 품목의 실사 재고를 반영하시겠습니까?\n(기존 실사 재고를 덮어씁니다)`)) {
-            return;
-        }
+    async submitScan() {
+        const items = Object.values(this.scanList);
+        if (items.length === 0) return alert('저장할 스캔 내역이 없습니다.');
+        if (this.dom.targetStoreSelect && !this.targetStoreId) return alert('작업할 매장이 선택되지 않았습니다.');
+        if (!confirm(`총 ${items.length}개 품목의 실사 재고를 반영하시겠습니까?\n(기존 실사 재고를 덮어씁니다)`)) return;
 
         try {
             const payload = {
-                items: items.map(item => ({
-                    barcode: item.barcode,
-                    quantity: item.scan_quantity
-                })),
-                target_store_id: targetStoreId // [수정] 매장 ID 함께 전송
+                items: items.map(item => ({ barcode: item.barcode, quantity: item.scan_quantity })),
+                target_store_id: this.targetStoreId
             };
 
-            const response = await fetch(updateUrl, {
+            const response = await fetch(this.urls.updateActual, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': Flowork.getCsrfToken() },
                 body: JSON.stringify(payload)
             });
-
             const result = await response.json();
 
             if (response.ok && result.status === 'success') {
                 alert(result.message);
-                scanList = {};
-                renderTable();
-                // 페이지 새로고침 없이 계속 작업 가능하도록
+                this.clearScanList();
             } else {
                 alert(`저장 실패: ${result.message}`);
             }
+        } catch (error) { alert('서버 통신 중 오류가 발생했습니다.'); }
+    }
 
-        } catch (error) {
-            console.error('Save Error:', error);
-            alert('서버 통신 중 오류가 발생했습니다.');
-        }
-    });
-
-    // 유틸: 상태 메시지 표시
-    let alertTimeout;
-    function showStatus(msg, type) {
-        scanStatusMessage.textContent = msg;
-        scanStatusAlert.className = `alert alert-${type} alert-dismissible fade show`;
-        scanStatusAlert.style.display = 'block';
+    showStatus(msg, type) {
+        if(!this.dom.scanStatusMessage) return;
+        this.dom.scanStatusMessage.textContent = msg;
+        this.dom.scanStatusAlert.className = `alert alert-${type} alert-dismissible fade show`;
+        this.dom.scanStatusAlert.style.display = 'block';
         
-        if (alertTimeout) clearTimeout(alertTimeout);
-        alertTimeout = setTimeout(() => {
-            // scanStatusAlert.style.display = 'none'; // 굳이 안 숨겨도 됨
+        clearTimeout(this.alertTimeout);
+        this.alertTimeout = setTimeout(() => {
+            // this.dom.scanStatusAlert.style.display = 'none'; // UX 선택사항
         }, 3000);
     }
+}
 
-    // 유틸: 에러 사운드 (선택 사항)
-    function playErrorSound() {
-        // 비프음 등 구현 가능
-    }
-
-    // 유틸: CSRF 토큰 가져오기 (메타 태그에서)
-    function getCsrfToken() {
-        // HTML <meta name="csrf-token" content="..."> 가 있다고 가정
-        // 없다면 Hidden Input 등에서 가져와야 함. 
-        // Flask-WTF를 쓴다면 보통 폼 안에 있거나 메타 태그에 둠.
-        // 여기서는 임시로 null 처리하거나, 필요 시 구현.
-        // 보통 fetch 시에는 headers에 'X-CSRFToken': ... 를 넣음.
-        
-        // 예시:
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        return meta ? meta.getAttribute('content') : '';
-    }
-    
-    // [추가] 재고 초기화 폼 제출 전 검증
-    if (resetForm) {
-        resetForm.addEventListener('submit', (e) => {
-            if (targetStoreSelect && !resetHiddenInput.value) {
-                e.preventDefault();
-                alert('초기화할 매장을 선택해주세요.');
-            }
-        });
-    }
-});
+window.PageRegistry = window.PageRegistry || {};
+window.PageRegistry['check'] = new CheckApp();

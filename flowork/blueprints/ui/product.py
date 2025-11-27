@@ -29,7 +29,8 @@ def product_detail(product_id):
             abort(404, description="상품을 찾을 수 없거나 권한이 없습니다.")
 
         context = {
-            'active_page': 'search',
+            # [수정] JS의 PageRegistry['product_detail']과 일치시킴
+            'active_page': 'product_detail', 
             'is_partial': is_partial,
             **data # 서비스에서 리턴한 딕셔너리 언패킹 (product, variants 등 포함)
         }

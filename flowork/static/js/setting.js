@@ -1,100 +1,146 @@
-/**
- * Admin Setting Logic
- * Refactored to use Class-based structure and Common Utilities
- */
-
 class SettingApp {
     constructor() {
-        const ds = document.body.dataset;
+        this.container = null;
+        this.dom = {};
+        this.handlers = {};
+        this.urls = {};
+        
+        // Modal instances
+        this.modalStore = null;
+        this.modalStaff = null;
+    }
+
+    init(container) {
+        this.container = container;
+        const bodyDs = document.body.dataset;
+        
+        // API URL 설정 (base.html의 dataset 활용)
         this.urls = {
-            setBrand: ds.apiBrandNameSetUrl,
-            addStore: ds.apiStoresAddUrl,
-            updateStore: ds.apiStoreUpdateUrlPrefix,
-            delStore: ds.apiStoreDeleteUrlPrefix,
-            approveStore: ds.apiStoreApproveUrlPrefix,
-            toggleActive: ds.apiStoreToggleActiveUrlPrefix,
-            resetStore: ds.apiStoreResetUrlPrefix,
-            addStaff: ds.apiStaffAddUrl,
-            updateStaff: ds.apiStaffUpdateUrlPrefix,
-            delStaff: ds.apiStaffDeleteUrlPrefix,
-            loadSettings: ds.apiLoadSettingsUrl,
-            updateSetting: ds.apiSettingUrl
+            setBrand: bodyDs.apiBrandNameSetUrl,
+            addStore: bodyDs.apiStoresAddUrl,
+            updateStore: bodyDs.apiStoreUpdateUrlPrefix,
+            delStore: bodyDs.apiStoreDeleteUrlPrefix,
+            approveStore: bodyDs.apiStoreApproveUrlPrefix,
+            toggleActive: bodyDs.apiStoreToggleActiveUrlPrefix,
+            resetStore: bodyDs.apiStoreResetUrlPrefix,
+            addStaff: bodyDs.apiStaffAddUrl,
+            updateStaff: bodyDs.apiStaffUpdateUrlPrefix,
+            delStaff: bodyDs.apiStaffDeleteUrlPrefix,
+            loadSettings: bodyDs.apiLoadSettingsUrl,
+            updateSetting: bodyDs.apiSettingUrl
         };
 
-        this.dom = this.cacheDom();
-        this.init();
-    }
-
-    cacheDom() {
-        return {
-            formBrand: document.getElementById('form-brand-name'),
-            btnLoadSettings: document.getElementById('btn-load-settings'),
-            statusLoadSettings: document.getElementById('load-settings-status'),
+        this.dom = {
+            formBrand: container.querySelector('#form-brand-name'),
+            btnLoadSettings: container.querySelector('#btn-load-settings'),
+            statusLoadSettings: container.querySelector('#load-settings-status'),
             
-            formAddStore: document.getElementById('form-add-store'),
-            tableStores: document.getElementById('all-stores-table'),
-            statusAddStore: document.getElementById('add-store-status'),
+            formAddStore: container.querySelector('#form-add-store'),
+            tableStores: container.querySelector('#all-stores-table'),
+            statusAddStore: container.querySelector('#add-store-status'),
             
-            formAddStaff: document.getElementById('form-add-staff'),
-            tableStaff: document.getElementById('all-staff-table'),
-            statusAddStaff: document.getElementById('add-staff-status'),
+            formAddStaff: container.querySelector('#form-add-staff'),
+            tableStaff: container.querySelector('#all-staff-table'),
+            statusAddStaff: container.querySelector('#add-staff-status'),
             
-            formCat: document.getElementById('form-category-config'),
-            catContainer: document.getElementById('cat-buttons-container'),
-            btnCatAdd: document.getElementById('btn-add-cat-row'),
-            catStatus: document.getElementById('category-config-status'),
+            formCat: container.querySelector('#form-category-config'),
+            catContainer: container.querySelector('#cat-buttons-container'),
+            btnCatAdd: container.querySelector('#btn-add-cat-row'),
+            catStatus: container.querySelector('#category-config-status'),
             
-            modalStore: new bootstrap.Modal(document.getElementById('edit-store-modal') || document.createElement('div')),
-            modalStaff: new bootstrap.Modal(document.getElementById('edit-staff-modal') || document.createElement('div'))
+            // Modals (Scoped)
+            modalStoreEl: container.querySelector('#edit-store-modal'),
+            modalStaffEl: container.querySelector('#edit-staff-modal'),
+            
+            // Modal Save Buttons
+            btnSaveStore: container.querySelector('#btn-save-edit-store'),
+            btnSaveStaff: container.querySelector('#btn-save-edit-staff'),
+            
+            // Backup Selects
+            ordersSelect: container.querySelector('#orders_target_store'),
+            stockSelect: container.querySelector('#stock_target_store')
         };
-    }
 
-    init() {
-        if(this.dom.formBrand) this.dom.formBrand.addEventListener('submit', (e) => this.setBrandName(e));
-        if(this.dom.btnLoadSettings) this.dom.btnLoadSettings.addEventListener('click', () => this.loadSettings());
-        if(this.dom.formAddStore) this.dom.formAddStore.addEventListener('submit', (e) => this.addStore(e));
-        
-        if(this.dom.tableStores) {
-            this.dom.tableStores.addEventListener('click', (e) => {
-                const btn = e.target.closest('button');
-                if(!btn) return;
-                if(btn.classList.contains('btn-delete-store')) this.deleteStore(btn);
-                if(btn.classList.contains('btn-edit-store')) this.openStoreModal(btn);
-                if(btn.classList.contains('btn-approve-store')) this.approveStore(btn);
-                if(btn.classList.contains('btn-reset-store')) this.resetStore(btn);
-                if(btn.classList.contains('btn-toggle-active-store')) this.toggleStoreActive(btn);
-            });
-        }
+        // Initialize Modals
+        if (this.dom.modalStoreEl) this.modalStore = new bootstrap.Modal(this.dom.modalStoreEl);
+        if (this.dom.modalStaffEl) this.modalStaff = new bootstrap.Modal(this.dom.modalStaffEl);
 
-        if(this.dom.formAddStaff) this.dom.formAddStaff.addEventListener('submit', (e) => this.addStaff(e));
-        
-        if(this.dom.tableStaff) {
-            this.dom.tableStaff.addEventListener('click', (e) => {
-                const btn = e.target.closest('button');
-                if(!btn) return;
-                if(btn.classList.contains('btn-delete-staff')) this.deleteStaff(btn);
-                if(btn.classList.contains('btn-edit-staff')) this.openStaffModal(btn);
-            });
-        }
-
+        this.bindEvents();
         this.initCategoryForm();
-        
-        // 모달 저장 버튼 이벤트
-        const btnSaveStore = document.getElementById('btn-save-edit-store');
-        if(btnSaveStore) btnSaveStore.addEventListener('click', () => this.saveStoreEdit(btnSaveStore));
-        
-        const btnSaveStaff = document.getElementById('btn-save-edit-staff');
-        if(btnSaveStaff) btnSaveStaff.addEventListener('click', () => this.saveStaffEdit(btnSaveStaff));
+        this.initBackupSelects();
     }
+
+    destroy() {
+        if(this.dom.formBrand) this.dom.formBrand.removeEventListener('submit', this.handlers.setBrand);
+        if(this.dom.btnLoadSettings) this.dom.btnLoadSettings.removeEventListener('click', this.handlers.loadSettings);
+        if(this.dom.formAddStore) this.dom.formAddStore.removeEventListener('submit', this.handlers.addStore);
+        if(this.dom.tableStores) this.dom.tableStores.removeEventListener('click', this.handlers.storeTableClick);
+        if(this.dom.formAddStaff) this.dom.formAddStaff.removeEventListener('submit', this.handlers.addStaff);
+        if(this.dom.tableStaff) this.dom.tableStaff.removeEventListener('click', this.handlers.staffTableClick);
+        
+        if(this.dom.btnCatAdd) this.dom.btnCatAdd.removeEventListener('click', this.handlers.addCatRow);
+        if(this.dom.catContainer) this.dom.catContainer.removeEventListener('click', this.handlers.removeCatRow);
+        if(this.dom.formCat) this.dom.formCat.removeEventListener('submit', this.handlers.saveCat);
+        
+        if(this.dom.btnSaveStore) this.dom.btnSaveStore.removeEventListener('click', this.handlers.saveStore);
+        if(this.dom.btnSaveStaff) this.dom.btnSaveStaff.removeEventListener('click', this.handlers.saveStaff);
+        
+        if(this.dom.ordersSelect) this.dom.ordersSelect.removeEventListener('change', this.handlers.updateOrdersHidden);
+        if(this.dom.stockSelect) this.dom.stockSelect.removeEventListener('change', this.handlers.updateStockHidden);
+
+        // 모달 백드롭 제거
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(bd => bd.remove());
+
+        this.container = null;
+        this.dom = {};
+        this.handlers = {};
+    }
+
+    bindEvents() {
+        this.handlers = {
+            setBrand: (e) => this.setBrandName(e),
+            loadSettings: () => this.loadSettings(),
+            addStore: (e) => this.addStore(e),
+            storeTableClick: (e) => this.handleStoreTableClick(e),
+            addStaff: (e) => this.addStaff(e),
+            staffTableClick: (e) => this.handleStaffTableClick(e),
+            saveStore: () => this.saveStoreEdit(),
+            saveStaff: () => this.saveStaffEdit(),
+            addCatRow: () => this.addCategoryRow(),
+            removeCatRow: (e) => { if(e.target.closest('.btn-remove-cat')) e.target.closest('.cat-row').remove(); },
+            saveCat: (e) => this.saveCategoryConfig(e),
+            updateOrdersHidden: () => this.updateHiddenInputs(this.dom.ordersSelect),
+            updateStockHidden: () => this.updateHiddenInputs(this.dom.stockSelect)
+        };
+
+        if(this.dom.formBrand) this.dom.formBrand.addEventListener('submit', this.handlers.setBrand);
+        if(this.dom.btnLoadSettings) this.dom.btnLoadSettings.addEventListener('click', this.handlers.loadSettings);
+        if(this.dom.formAddStore) this.dom.formAddStore.addEventListener('submit', this.handlers.addStore);
+        if(this.dom.tableStores) this.dom.tableStores.addEventListener('click', this.handlers.storeTableClick);
+        if(this.dom.formAddStaff) this.dom.formAddStaff.addEventListener('submit', this.handlers.addStaff);
+        if(this.dom.tableStaff) this.dom.tableStaff.addEventListener('click', this.handlers.staffTableClick);
+        if(this.dom.btnSaveStore) this.dom.btnSaveStore.addEventListener('click', this.handlers.saveStore);
+        if(this.dom.btnSaveStaff) this.dom.btnSaveStaff.addEventListener('click', this.handlers.saveStaff);
+        
+        if(this.dom.btnCatAdd) this.dom.btnCatAdd.addEventListener('click', this.handlers.addCatRow);
+        if(this.dom.catContainer) this.dom.catContainer.addEventListener('click', this.handlers.removeCatRow);
+        if(this.dom.formCat) this.dom.formCat.addEventListener('submit', this.handlers.saveCat);
+        
+        if(this.dom.ordersSelect) this.dom.ordersSelect.addEventListener('change', this.handlers.updateOrdersHidden);
+        if(this.dom.stockSelect) this.dom.stockSelect.addEventListener('change', this.handlers.updateStockHidden);
+    }
+
+    // --- Logic Methods ---
 
     async setBrandName(e) {
         e.preventDefault();
-        const name = document.getElementById('brand-name-input').value.trim();
+        const name = this.container.querySelector('#brand-name-input').value.trim();
         if(!name) return alert('이름 필수');
         
         try {
             const res = await Flowork.post(this.urls.setBrand, { brand_name: name });
-            document.getElementById('brand-name-status').innerHTML = `<div class="alert alert-success mt-2">${res.message}</div>`;
+            this.container.querySelector('#brand-name-status').innerHTML = `<div class="alert alert-success mt-2">${res.message}</div>`;
         } catch(e) { alert('저장 실패'); }
     }
 
@@ -116,79 +162,98 @@ class SettingApp {
     async addStore(e) {
         e.preventDefault();
         const payload = {
-            store_code: document.getElementById('new_store_code').value,
-            store_name: document.getElementById('new_store_name').value,
-            store_phone: document.getElementById('new_store_phone').value
+            store_code: this.container.querySelector('#new_store_code').value,
+            store_name: this.container.querySelector('#new_store_name').value,
+            store_phone: this.container.querySelector('#new_store_phone').value
         };
         
         try {
             const res = await Flowork.post(this.urls.addStore, payload);
             this.dom.statusAddStore.innerHTML = `<div class="alert alert-success">${res.message}</div>`;
-            window.location.reload();
+            this.refreshTab(); // Reload tab
         } catch(e) {
             this.dom.statusAddStore.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
         }
     }
 
-    // ... (스토어 관련 나머지 메서드는 패턴이 동일하므로 Flowork.api 적용) ...
-    async deleteStore(btn) {
+    handleStoreTableClick(e) {
+        const btn = e.target.closest('button');
+        if(!btn) return;
+        
+        const id = btn.dataset.id;
+        if(btn.classList.contains('btn-delete-store')) this.deleteStore(id, btn);
+        if(btn.classList.contains('btn-edit-store')) this.openStoreModal(btn);
+        if(btn.classList.contains('btn-approve-store')) this.approveStore(id);
+        if(btn.classList.contains('btn-reset-store')) this.resetStore(id);
+        if(btn.classList.contains('btn-toggle-active-store')) this.toggleStoreActive(id);
+    }
+
+    async deleteStore(id, btn) {
         if(!confirm('삭제하시겠습니까?')) return;
         try {
-            await Flowork.api(`${this.urls.delStore}${btn.dataset.id}`, { method: 'DELETE' });
+            await Flowork.api(`${this.urls.delStore}${id}`, { method: 'DELETE' });
             btn.closest('tr').remove();
         } catch(e) { alert(e.message); }
     }
 
     openStoreModal(btn) {
-        document.getElementById('edit_store_code').value = btn.dataset.code;
-        document.getElementById('edit_store_name').value = btn.dataset.name;
-        document.getElementById('edit_store_phone').value = btn.dataset.phone;
-        document.getElementById('btn-save-edit-store').dataset.storeId = btn.dataset.id;
+        this.container.querySelector('#edit_store_code').value = btn.dataset.code;
+        this.container.querySelector('#edit_store_name').value = btn.dataset.name;
+        this.container.querySelector('#edit_store_phone').value = btn.dataset.phone;
+        this.dom.btnSaveStore.dataset.storeId = btn.dataset.id;
+        this.modalStore.show();
     }
 
-    async saveStoreEdit(btn) {
-        const id = btn.dataset.storeId;
+    async saveStoreEdit() {
+        const id = this.dom.btnSaveStore.dataset.storeId;
         const payload = {
-            store_code: document.getElementById('edit_store_code').value,
-            store_name: document.getElementById('edit_store_name').value,
-            store_phone: document.getElementById('edit_store_phone').value
+            store_code: this.container.querySelector('#edit_store_code').value,
+            store_name: this.container.querySelector('#edit_store_name').value,
+            store_phone: this.container.querySelector('#edit_store_phone').value
         };
         try {
             await Flowork.post(`${this.urls.updateStore}${id}`, payload);
-            window.location.reload();
+            this.modalStore.hide();
+            this.refreshTab();
         } catch(e) { alert(e.message); }
     }
 
-    async approveStore(btn) {
+    async approveStore(id) {
         if(!confirm('승인하시겠습니까?')) return;
-        try { await Flowork.post(`${this.urls.approveStore}${btn.dataset.id}`, {}); window.location.reload(); }
+        try { await Flowork.post(`${this.urls.approveStore}${id}`, {}); this.refreshTab(); }
         catch(e) { alert(e.message); }
     }
 
-    async resetStore(btn) {
+    async resetStore(id) {
         if(!confirm('초기화하시겠습니까?')) return;
-        try { await Flowork.post(`${this.urls.resetStore}${btn.dataset.id}`, {}); window.location.reload(); }
+        try { await Flowork.post(`${this.urls.resetStore}${id}`, {}); this.refreshTab(); }
         catch(e) { alert(e.message); }
     }
 
-    async toggleStoreActive(btn) {
+    async toggleStoreActive(id) {
         if(!confirm('상태 변경?')) return;
-        try { await Flowork.post(`${this.urls.toggleActive}${btn.dataset.id}`, {}); window.location.reload(); }
+        try { await Flowork.post(`${this.urls.toggleActive}${id}`, {}); this.refreshTab(); }
         catch(e) { alert(e.message); }
     }
 
-    // ... (직원 관련 메서드) ...
     async addStaff(e) {
         e.preventDefault();
         const payload = {
-            name: document.getElementById('new_staff_name').value,
-            position: document.getElementById('new_staff_position').value,
-            contact: document.getElementById('new_staff_contact').value
+            name: this.container.querySelector('#new_staff_name').value,
+            position: this.container.querySelector('#new_staff_position').value,
+            contact: this.container.querySelector('#new_staff_contact').value
         };
         try {
             await Flowork.post(this.urls.addStaff, payload);
-            window.location.reload();
+            this.refreshTab();
         } catch(e) { alert(e.message); }
+    }
+
+    handleStaffTableClick(e) {
+        const btn = e.target.closest('button');
+        if(!btn) return;
+        if(btn.classList.contains('btn-delete-staff')) this.deleteStaff(btn);
+        if(btn.classList.contains('btn-edit-staff')) this.openStaffModal(btn);
     }
 
     async deleteStaff(btn) {
@@ -200,79 +265,110 @@ class SettingApp {
     }
 
     openStaffModal(btn) {
-        document.getElementById('edit_staff_name').value = btn.dataset.name;
-        document.getElementById('edit_staff_position').value = btn.dataset.position;
-        document.getElementById('edit_staff_contact').value = btn.dataset.contact;
-        document.getElementById('btn-save-edit-staff').dataset.staffId = btn.dataset.id;
+        this.container.querySelector('#edit_staff_name').value = btn.dataset.name;
+        this.container.querySelector('#edit_staff_position').value = btn.dataset.position;
+        this.container.querySelector('#edit_staff_contact').value = btn.dataset.contact;
+        this.dom.btnSaveStaff.dataset.staffId = btn.dataset.id;
+        this.modalStaff.show();
     }
 
-    async saveStaffEdit(btn) {
-        const id = btn.dataset.staffId;
+    async saveStaffEdit() {
+        const id = this.dom.btnSaveStaff.dataset.staffId;
         const payload = {
-            name: document.getElementById('edit_staff_name').value,
-            position: document.getElementById('edit_staff_position').value,
-            contact: document.getElementById('edit_staff_contact').value
+            name: this.container.querySelector('#edit_staff_name').value,
+            position: this.container.querySelector('#edit_staff_position').value,
+            contact: this.container.querySelector('#edit_staff_contact').value
         };
         try {
             await Flowork.post(`${this.urls.updateStaff}${id}`, payload);
-            window.location.reload();
+            this.modalStaff.hide();
+            this.refreshTab();
         } catch(e) { alert(e.message); }
     }
 
-    // 카테고리 설정 로직
+    // Category Logic
     initCategoryForm() {
         if(!this.dom.formCat) return;
+        // window.initialCategoryConfig는 setting.html의 인라인 스크립트에 있음.
+        // SPA에서는 이를 수동으로 실행하거나 데이터를 파싱해야 함.
+        let savedConfig = null;
         
-        const saved = window.initialCategoryConfig;
-        const addRow = (l='', v='') => {
-            const html = `
-                <div class="input-group mb-2 cat-row">
-                    <span class="input-group-text">라벨</span><input type="text" class="form-control cat-label" value="${l}">
-                    <span class="input-group-text">값</span><input type="text" class="form-control cat-value" value="${v}">
-                    <button type="button" class="btn btn-outline-danger btn-remove-cat"><i class="bi bi-x-lg"></i></button>
-                </div>`;
-            this.dom.catContainer.insertAdjacentHTML('beforeend', html);
-        };
+        // 1. 인라인 스크립트 실행 시도
+        const scripts = this.container.querySelectorAll('script');
+        scripts.forEach(s => {
+            if (s.innerText.includes('window.initialCategoryConfig')) {
+                try { eval(s.innerText); savedConfig = window.initialCategoryConfig; } catch(e) {}
+            }
+        });
 
-        if(saved) {
-            if(saved.columns) document.getElementById('cat-columns').value = saved.columns;
-            if(saved.buttons) {
+        if (savedConfig) {
+            if(savedConfig.columns) this.container.querySelector('#cat-columns').value = savedConfig.columns;
+            if(savedConfig.buttons) {
                 this.dom.catContainer.innerHTML = '';
-                saved.buttons.forEach(b => addRow(b.label, b.value));
+                savedConfig.buttons.forEach(b => this.addCategoryRow(b.label, b.value));
             }
         } else {
             if(this.dom.catContainer.children.length === 0) {
-                ['전체','신발','의류','용품'].forEach(t => addRow(t, t));
+                ['전체','신발','의류','용품'].forEach(t => this.addCategoryRow(t, t));
             }
         }
+    }
 
-        this.dom.btnCatAdd.onclick = () => addRow();
-        this.dom.catContainer.onclick = (e) => {
-            if(e.target.closest('.btn-remove-cat')) e.target.closest('.cat-row').remove();
-        };
+    addCategoryRow(l='', v='') {
+        const html = `
+            <div class="input-group mb-2 cat-row">
+                <span class="input-group-text">라벨</span><input type="text" class="form-control cat-label" value="${l}">
+                <span class="input-group-text">값</span><input type="text" class="form-control cat-value" value="${v}">
+                <button type="button" class="btn btn-outline-danger btn-remove-cat"><i class="bi bi-x-lg"></i></button>
+            </div>`;
+        this.dom.catContainer.insertAdjacentHTML('beforeend', html);
+    }
 
-        this.dom.formCat.onsubmit = async (e) => {
-            e.preventDefault();
-            const buttons = [];
-            this.dom.catContainer.querySelectorAll('.cat-row').forEach(r => {
-                const l = r.querySelector('.cat-label').value.trim();
-                const v = r.querySelector('.cat-value').value.trim();
-                if(l && v) buttons.push({label: l, value: v});
-            });
-            
-            const config = {
-                columns: parseInt(document.getElementById('cat-columns').value),
-                buttons: buttons
-            };
-            
-            try {
-                await Flowork.post(this.urls.updateSetting, { key: 'CATEGORY_CONFIG', value: config });
-                this.dom.catStatus.innerHTML = '<div class="alert alert-success mt-2">저장됨</div>';
-            } catch(e) {
-                this.dom.catStatus.innerHTML = `<div class="alert alert-danger mt-2">${e.message}</div>`;
-            }
+    async saveCategoryConfig(e) {
+        e.preventDefault();
+        const buttons = [];
+        this.dom.catContainer.querySelectorAll('.cat-row').forEach(r => {
+            const l = r.querySelector('.cat-label').value.trim();
+            const v = r.querySelector('.cat-value').value.trim();
+            if(l && v) buttons.push({label: l, value: v});
+        });
+        
+        const config = {
+            columns: parseInt(this.container.querySelector('#cat-columns').value),
+            buttons: buttons
         };
+        
+        try {
+            await Flowork.post(this.urls.updateSetting, { key: 'CATEGORY_CONFIG', value: config });
+            this.dom.catStatus.innerHTML = '<div class="alert alert-success mt-2">저장됨</div>';
+        } catch(e) {
+            this.dom.catStatus.innerHTML = `<div class="alert alert-danger mt-2">${e.message}</div>`;
+        }
+    }
+
+    // Backup Select Logic
+    initBackupSelects() {
+        if(this.dom.ordersSelect) this.updateHiddenInputs(this.dom.ordersSelect);
+        if(this.dom.stockSelect) this.updateHiddenInputs(this.dom.stockSelect);
+    }
+
+    updateHiddenInputs(select) {
+        if (!select) return;
+        const val = select.value;
+        const form = select.closest('.card-body').querySelector('form');
+        if (form) {
+            const hidden = form.querySelector('.target-store-id-input');
+            if(hidden) hidden.value = val;
+        }
+    }
+
+    refreshTab() {
+        if(TabManager.activeTabId) {
+            const tab = TabManager.tabs.find(t => t.id === TabManager.activeTabId);
+            if(tab) TabManager.loadContent(tab.id, tab.url);
+        }
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => new SettingApp());
+window.PageRegistry = window.PageRegistry || {};
+window.PageRegistry['setting'] = new SettingApp();

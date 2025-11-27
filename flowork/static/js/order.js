@@ -1,121 +1,140 @@
-/**
- * Order Management Logic
- * Refactored to use Class-based structure and Common Utilities
- */
-
 class OrderApp {
     constructor() {
-        this.dom = {
-            receptionToggles: document.getElementById('reception-method-toggles'),
-            addressWrapper: document.getElementById('address-fields-wrapper'),
-            addressRequiredText: document.getElementById('address-required-text'),
-            statusSelect: document.getElementById('order_status'),
-            shippingWrapper: document.getElementById('shipping-fields-wrapper'),
-            completionWrapper: document.getElementById('completion-date-wrapper'),
-            completionInput: document.getElementById('completed_at'),
-            btnSearchAddress: document.getElementById('btn-search-address'),
-            pnInput: document.getElementById('product_number'),
-            pNameInput: document.getElementById('product_name'),
-            colorSelect: document.getElementById('color'),
-            sizeSelect: document.getElementById('size'),
-            statusText: document.getElementById('product-lookup-status'),
-            btnSearch: document.getElementById('btn-product-search'),
-            resultsDiv: document.getElementById('product-search-results'),
-            processingBody: document.getElementById('processing-table-body'),
-            btnAddRow: document.getElementById('btn-add-processing-row'),
-            rowTemplate: document.getElementById('processing-row-template'),
-            btnDeleteOrder: document.getElementById('btn-delete-order'),
-            formOrder: document.getElementById('order-form'),
-            formDelete: document.getElementById('delete-order-form'),
-            btnEnableEdit: document.getElementById('btn-enable-edit')
-        };
+        this.container = null;
+        this.dom = {};
+        this.urls = {};
+        this.data = {};
+        this.handlers = {};
+    }
+
+    init(container) {
+        this.container = container;
         
+        this.dom = {
+            receptionToggles: container.querySelector('#reception-method-toggles'),
+            addressWrapper: container.querySelector('#address-fields-wrapper'),
+            addressRequiredText: container.querySelector('#address-required-text'),
+            statusSelect: container.querySelector('#order_status'),
+            shippingWrapper: container.querySelector('#shipping-fields-wrapper'),
+            completionWrapper: container.querySelector('#completion-date-wrapper'),
+            completionInput: container.querySelector('#completed_at'),
+            btnSearchAddress: container.querySelector('#btn-search-address'),
+            pnInput: container.querySelector('#product_number'),
+            pNameInput: container.querySelector('#product_name'),
+            colorSelect: container.querySelector('#color'),
+            sizeSelect: container.querySelector('#size'),
+            statusText: container.querySelector('#product-lookup-status'),
+            btnSearch: container.querySelector('#btn-product-search'),
+            resultsDiv: container.querySelector('#product-search-results'),
+            processingBody: container.querySelector('#processing-table-body'),
+            btnAddRow: container.querySelector('#btn-add-processing-row'),
+            rowTemplate: container.querySelector('#processing-row-template'),
+            btnDeleteOrder: container.querySelector('#btn-delete-order'),
+            formOrder: container.querySelector('#order-form'),
+            formDelete: container.querySelector('#delete-order-form'),
+            btnEnableEdit: container.querySelector('#btn-enable-edit')
+        };
+
+        const bodyDs = document.body.dataset;
         this.urls = {
-            lookup: document.body.dataset.productLookupUrl,
-            search: document.body.dataset.productSearchUrl
+            lookup: bodyDs.productLookupUrl || '/api/find_product_details',
+            search: bodyDs.productSearchUrl || '/api/order_product_search'
         };
         
         this.data = {
-            color: document.body.dataset.currentColor,
-            size: document.body.dataset.currentSize
+            color: bodyDs.currentColor,
+            size: bodyDs.currentSize
         };
 
-        this.init();
+        this.bindEvents();
+        this.toggleAddressFields();
+        this.toggleStatusFields();
+
+        if(this.dom.pnInput && this.dom.pnInput.value) {
+            this.fetchProductOptions(this.dom.pnInput.value);
+        }
     }
 
-    init() {
-        if(this.dom.receptionToggles) this.dom.receptionToggles.addEventListener('change', () => this.toggleAddressFields());
-        if(this.dom.statusSelect) this.dom.statusSelect.addEventListener('change', () => this.toggleStatusFields());
-        
-        if(this.dom.btnSearchAddress) {
-            this.dom.btnSearchAddress.addEventListener('click', () => {
-                new daum.Postcode({
-                    oncomplete: (data) => {
-                        document.getElementById('postcode').value = data.zonecode;
-                        document.getElementById('address1').value = data.roadAddress || data.jibunAddress;
-                        document.getElementById('address2').focus();
-                    }
-                }).open();
-            });
-        }
+    destroy() {
+        if(this.dom.receptionToggles) this.dom.receptionToggles.removeEventListener('change', this.handlers.toggleAddress);
+        if(this.dom.statusSelect) this.dom.statusSelect.removeEventListener('change', this.handlers.toggleStatus);
+        if(this.dom.btnSearchAddress) this.dom.btnSearchAddress.removeEventListener('click', this.handlers.searchAddress);
+        if(this.dom.btnSearch) this.dom.btnSearch.removeEventListener('click', this.handlers.searchProduct);
+        if(this.dom.resultsDiv) this.dom.resultsDiv.removeEventListener('click', this.handlers.selectProduct);
+        if(this.dom.pnInput) this.dom.pnInput.removeEventListener('keydown', this.handlers.pnKeydown);
+        document.removeEventListener('click', this.handlers.closeSearch);
+        if(this.dom.btnAddRow) this.dom.btnAddRow.removeEventListener('click', this.handlers.addRow);
+        if(this.dom.processingBody) this.dom.processingBody.removeEventListener('click', this.handlers.deleteRow);
+        if(this.dom.btnDeleteOrder) this.dom.btnDeleteOrder.removeEventListener('click', this.handlers.deleteOrder);
+        if(this.dom.formOrder) this.dom.formOrder.removeEventListener('submit', this.handlers.validate);
+        if(this.dom.btnEnableEdit) this.dom.btnEnableEdit.removeEventListener('click', this.handlers.enableEdit);
 
-        if(this.dom.btnSearch) this.dom.btnSearch.addEventListener('click', () => this.searchProduct());
-        if(this.dom.resultsDiv) {
-            this.dom.resultsDiv.addEventListener('click', (e) => {
+        this.container = null;
+        this.dom = {};
+    }
+
+    bindEvents() {
+        this.handlers = {
+            toggleAddress: () => this.toggleAddressFields(),
+            toggleStatus: () => this.toggleStatusFields(),
+            searchAddress: () => this.execDaumPostcode(),
+            searchProduct: () => this.searchProduct(),
+            selectProduct: (e) => {
                 const target = e.target.closest('.list-group-item-action');
                 if(target) {
                     e.preventDefault();
                     this.selectProduct(target.dataset.pn);
                 }
-            });
-        }
-        
-        if(this.dom.pnInput) {
-            this.dom.pnInput.addEventListener('keydown', (e) => {
+            },
+            pnKeydown: (e) => {
                 if(e.key === 'Enter') { e.preventDefault(); this.dom.btnSearch.click(); }
-            });
-            // 초기 로드 시 값이 있으면 조회
-            if(this.dom.pnInput.value) this.fetchProductOptions(this.dom.pnInput.value);
-        }
-
-        // 상품 검색 결과창 닫기
-        document.addEventListener('click', (e) => {
-            if(this.dom.pnInput) {
-                const container = this.dom.pnInput.closest('.position-relative');
-                if(container && !container.contains(e.target)) this.dom.resultsDiv.style.display = 'none';
-            }
-        });
-
-        if(this.dom.btnAddRow) this.dom.btnAddRow.addEventListener('click', () => this.addProcessingRow());
-        if(this.dom.processingBody) {
-            this.dom.processingBody.addEventListener('click', (e) => {
+            },
+            closeSearch: (e) => {
+                if(this.dom.pnInput) {
+                    const container = this.dom.pnInput.closest('.position-relative');
+                    if(container && !container.contains(e.target)) this.dom.resultsDiv.style.display = 'none';
+                }
+            },
+            addRow: () => this.addProcessingRow(),
+            deleteRow: (e) => {
                 if(e.target.closest('.btn-delete-row')) this.deleteProcessingRow(e.target);
-            });
-        }
-
-        if(this.dom.btnDeleteOrder) {
-            this.dom.btnDeleteOrder.addEventListener('click', () => {
+            },
+            deleteOrder: () => {
                 if(confirm('🚨 경고!\n이 주문 내역을 삭제하시겠습니까?')) this.dom.formDelete.submit();
-            });
-        }
-
-        if(this.dom.formOrder) {
-            this.dom.formOrder.addEventListener('submit', (e) => this.validateForm(e));
-        }
-
-        if(this.dom.btnEnableEdit) {
-            this.dom.btnEnableEdit.addEventListener('click', (e) => {
+            },
+            validate: (e) => this.validateForm(e),
+            enableEdit: (e) => {
                 e.preventDefault();
                 document.body.dataset.pageMode = 'edit';
-                document.querySelectorAll('.editable-on-demand').forEach(el => {
+                this.container.querySelectorAll('.editable-on-demand').forEach(el => {
                     el.disabled = false; el.readOnly = false;
                 });
-                document.getElementById('created_at').focus();
-            });
-        }
+                this.container.querySelector('#created_at').focus();
+            }
+        };
 
-        this.toggleAddressFields();
-        this.toggleStatusFields();
+        if(this.dom.receptionToggles) this.dom.receptionToggles.addEventListener('change', this.handlers.toggleAddress);
+        if(this.dom.statusSelect) this.dom.statusSelect.addEventListener('change', this.handlers.toggleStatus);
+        if(this.dom.btnSearchAddress) this.dom.btnSearchAddress.addEventListener('click', this.handlers.searchAddress);
+        if(this.dom.btnSearch) this.dom.btnSearch.addEventListener('click', this.handlers.searchProduct);
+        if(this.dom.resultsDiv) this.dom.resultsDiv.addEventListener('click', this.handlers.selectProduct);
+        if(this.dom.pnInput) this.dom.pnInput.addEventListener('keydown', this.handlers.pnKeydown);
+        document.addEventListener('click', this.handlers.closeSearch);
+        if(this.dom.btnAddRow) this.dom.btnAddRow.addEventListener('click', this.handlers.addRow);
+        if(this.dom.processingBody) this.dom.processingBody.addEventListener('click', this.handlers.deleteRow);
+        if(this.dom.btnDeleteOrder) this.dom.btnDeleteOrder.addEventListener('click', this.handlers.deleteOrder);
+        if(this.dom.formOrder) this.dom.formOrder.addEventListener('submit', this.handlers.validate);
+        if(this.dom.btnEnableEdit) this.dom.btnEnableEdit.addEventListener('click', this.handlers.enableEdit);
+    }
+
+    execDaumPostcode() {
+        new daum.Postcode({
+            oncomplete: (data) => {
+                this.container.querySelector('#postcode').value = data.zonecode;
+                this.container.querySelector('#address1').value = data.roadAddress || data.jibunAddress;
+                this.container.querySelector('#address2').focus();
+            }
+        }).open();
     }
 
     toggleAddressFields() {
@@ -125,8 +144,8 @@ class OrderApp {
         
         this.dom.addressWrapper.style.display = isDelivery ? 'block' : 'none';
         this.dom.addressRequiredText.style.display = isDelivery ? 'block' : 'none';
-        document.getElementById('address1').required = isDelivery;
-        document.getElementById('address2').required = isDelivery;
+        this.container.querySelector('#address1').required = isDelivery;
+        this.container.querySelector('#address2').required = isDelivery;
     }
 
     toggleStatusFields() {
@@ -228,14 +247,13 @@ class OrderApp {
     }
 
     validateForm(e) {
-        // 수령 방법 검증
         const selected = this.dom.receptionToggles.querySelector('input:checked');
         if(selected && selected.value === '택배수령') {
-            if(!document.getElementById('address1').value) {
+            if(!this.container.querySelector('#address1').value) {
                 e.preventDefault(); alert('주소를 입력해주세요.'); return;
             }
         }
-        // 처리 내역 검증
+        
         const selects = this.dom.processingBody.querySelectorAll('select[name="processing_source"]');
         for(let s of selects) {
             if(!s.value) {
@@ -245,4 +263,5 @@ class OrderApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => new OrderApp());
+window.PageRegistry = window.PageRegistry || {};
+window.PageRegistry['order'] = new OrderApp();

@@ -2,6 +2,7 @@
  * FLOWORK Common Utilities
  * - API 통신 래퍼 (CSRF 자동 처리)
  * - 포맷팅 함수 (금액, 날짜)
+ * - 페이지 레지스트리 초기화 (SPA)
  */
 
 const Flowork = {
@@ -27,6 +28,13 @@ const Flowork = {
 
         try {
             const response = await fetch(url, settings);
+            
+            // 응답이 리다이렉트(로그인 페이지 이동 등)인 경우 처리
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+
             const data = await response.json();
             
             if (!response.ok) {
@@ -69,5 +77,8 @@ const Flowork = {
     }
 };
 
-// 전역에서 사용 가능하도록 설정
+// 전역 객체 등록
 window.Flowork = Flowork;
+
+// [신규] SPA 페이지 모듈 레지스트리 초기화
+window.PageRegistry = window.PageRegistry || {};
