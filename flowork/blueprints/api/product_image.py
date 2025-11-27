@@ -10,11 +10,13 @@ from flask import request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from sqlalchemy import text, func, or_, case
 from flowork.models import db, Product, Variant, Setting
+from flowork.extensions import cache
 from . import api_bp
 from flowork.celery_tasks import task_process_images
 
 @api_bp.route('/api/product/images', methods=['GET'])
 @login_required
+@cache.cached(timeout=60, query_string=True)
 def get_product_image_status():
     if not current_user.brand_id:
         return jsonify({'status': 'error', 'message': '브랜드 계정이 필요합니다.'}), 403

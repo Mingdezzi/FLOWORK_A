@@ -1,8 +1,3 @@
-/**
- * Online Management Application Logic
- * Refactored to use Class-based structure and Common Utilities
- */
-
 class OnlineManager {
     constructor() {
         const ds = document.body.dataset;
@@ -21,6 +16,9 @@ class OnlineManager {
         this.currentBatch = JSON.parse(sessionStorage.getItem('currentBatchCodes') || '[]');
         this.pollingInterval = null;
         this.isProcessing = false;
+        
+        this.loadedTabs = new Set();
+        this.isSearchChanged = false;
 
         this.dom = this.cacheDom();
         this.init();
@@ -51,12 +49,10 @@ class OnlineManager {
     init() {
         this.loadUserOptions();
         
-        // 탭 이벤트
         this.dom.tabs.forEach(tab => {
             tab.addEventListener('shown.bs.tab', (e) => this.loadTabContent(e.target));
         });
 
-        // 버튼 이벤트
         this.dom.btnSearch.onclick = () => this.search();
         this.dom.btnSearchReset.onclick = () => this.resetSearch();
         this.dom.btnLogo.onclick = () => this.uploadLogo();
@@ -75,7 +71,6 @@ class OnlineManager {
             };
         }
 
-        // 체크박스 이벤트 위임
         document.body.addEventListener('change', (e) => {
             if(e.target.classList.contains('check-all')) {
                 const table = e.target.closest('table');
@@ -85,10 +80,8 @@ class OnlineManager {
             if(e.target.classList.contains('item-check')) this.updateBtnState();
         });
 
-        // 초기 로드
         document.querySelectorAll('.nav-link.active').forEach(tab => this.loadTabContent(tab));
         
-        // 글로벌 함수 노출 (HTML onclick 용)
         window.showImageModal = (src) => { document.getElementById('preview-image-target').src = src; this.dom.imgModal.show(); };
         window.downloadImages = (code) => { window.location.href = `${this.urls.download}${code}`; };
         window.deleteImages = (code) => this.deleteImages(code);
@@ -133,6 +126,11 @@ class OnlineManager {
 
     loadTabContent(tab) {
         const targetId = tab.dataset.bsTarget.substring(1);
+        
+        if (this.loadedTabs.has(targetId) && !this.isSearchChanged) {
+             return; 
+        }
+
         const type = tab.dataset.tabType;
         const scope = tab.dataset.scope;
         const page = this.pagination[targetId] || 1;
@@ -142,7 +140,11 @@ class OnlineManager {
     refreshActiveTab(scope = null) {
         const sel = scope ? `.nav-link.active[data-scope="${scope}"]` : '.nav-link.active';
         const active = document.querySelector(sel);
-        if(active) this.loadTabContent(active);
+        if(active) {
+            const targetId = active.dataset.bsTarget.substring(1);
+            this.loadedTabs.delete(targetId);
+            this.loadTabContent(active);
+        }
     }
 
     async loadData(targetId, type, scope, page) {
@@ -175,6 +177,9 @@ class OnlineManager {
                 this.renderPagination(targetId, data.pagination);
                 const badge = document.getElementById(targetId.replace('tab-', 'cnt-'));
                 if(badge) badge.textContent = data.pagination.total_items;
+                
+                this.loadedTabs.add(targetId);
+                this.isSearchChanged = false;
             } else {
                 container.innerHTML = `<div class="text-danger p-5">${data.message}</div>`;
             }
@@ -244,7 +249,10 @@ class OnlineManager {
                 e.preventDefault();
                 if(!a.parentElement.classList.contains('disabled')) {
                     this.pagination[targetId] = parseInt(a.dataset.page);
-                    this.loadTabContent(document.querySelector(`button[data-bs-target="#${targetId}"]`));
+                    const btn = document.querySelector(`button[data-bs-target="#${targetId}"]`);
+                    const targetIdStr = btn.dataset.bsTarget.substring(1);
+                    this.loadedTabs.delete(targetIdStr);
+                    this.loadTabContent(btn);
                 }
             }
         });
@@ -274,7 +282,6 @@ class OnlineManager {
         try {
             const res = await Flowork.post(this.urls.process, { style_codes: codes, options });
             if(res.status === 'success') {
-                // 배치 업데이트
                 const newBatch = new Set([...this.currentBatch, ...codes]);
                 this.currentBatch = Array.from(newBatch);
                 sessionStorage.setItem('currentBatchCodes', JSON.stringify(this.currentBatch));
@@ -282,10 +289,9 @@ class OnlineManager {
                 
                 this.pollTask(res.task_id);
                 
-                // 진행중 탭으로 이동
                 const tab = document.querySelector('button[data-bs-target="#tab-current-processing"]');
                 new bootstrap.Tab(tab).show();
-                this.loadTabContent(tab);
+                this.refreshActiveTab('current');
             } else alert(res.message);
         } catch(e) { alert('요청 실패'); }
         finally { this.dom.btnStart.disabled = false; }
@@ -311,6 +317,7 @@ class OnlineManager {
                     setTimeout(() => {
                         this.dom.progContainer.style.display = 'none';
                         this.dom.progBar.style.width = '0%';
+                        this.loadedTabs.clear();
                         this.refreshActiveTab();
                     }, 2000);
                 }
@@ -326,6 +333,7 @@ class OnlineManager {
         try {
             await Flowork.post(document.body.dataset.apiReset || '/api/product/images/reset', { style_codes: codes });
             alert('초기화 완료');
+            this.loadedTabs.clear();
             this.refreshActiveTab();
         } catch(e) { alert('오류'); }
     }
@@ -335,6 +343,7 @@ class OnlineManager {
         try {
             await Flowork.post(this.urls.delete, { style_codes: [code] });
             alert('삭제 완료');
+            this.loadedTabs.clear();
             this.refreshActiveTab();
         } catch(e) { alert('삭제 실패'); }
     }
@@ -359,6 +368,8 @@ class OnlineManager {
     }
 
     search() {
+        this.isSearchChanged = true;
+        this.loadedTabs.clear();
         const tab = document.querySelector('button[data-bs-target="#tab-hist-all"]');
         new bootstrap.Tab(tab).show();
         this.pagination['tab-hist-all'] = 1;
